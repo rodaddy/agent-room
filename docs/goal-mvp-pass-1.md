@@ -105,6 +105,19 @@ Add structured logging that is useful but not chatty by default.
 
 Debug/test logs must be quiet by default and enabled by env flags. Catch/log at failure boundaries, not every pure helper. Add Prometheus/Grafana-compatible metrics stubs where natural, without overbuilding.
 
+## Resilience And Mocking Standard
+
+Do not stop on missing provider keys, missing paid services, or unavailable live integrations when the behavior can be worked around safely.
+
+- Missing key or provider: create/use mock adapters and fixture inputs/outputs.
+- Provider contracts must be real even when implementations are mocked.
+- Missing key behavior should produce a mocked or blocked provider event, not crash the room.
+- Voice/audio proof can use small public/sample audio fixtures, generated local clips, or tiny local test assets.
+- MLX or local model installs are allowed only when lightweight and useful for MVP validation.
+- Prefer small, low-quality, fast test models for MVP; keep heavier local inference optional.
+- Build degraded paths intentionally and keep moving through non-blocking friction.
+- Stop only for destructive actions, credential access, paid API use, live infra mutation, external service changes, or architecture-shaping decisions that need Rico.
+
 ## Documentation Standard
 
 Document public contracts, module boundaries, env vars, validation commands, and non-obvious behavior. Keep README/docs aligned with implemented commands.
