@@ -1,0 +1,15 @@
+{
+  "name": "agent-room",
+  "private": true,
+  "packageManager": "bun@1.2.17",
+  "workspaces": [
+    "apps/*",
+    "services/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "echo 'scaffold only - issue branches will add runnable apps'",
+    "lint": "echo 'not wired yet'",
+    "test": "echo 'not wired yet'"
+  }
+}
