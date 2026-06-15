@@ -29,17 +29,24 @@ Definition of done: local demo can open the room, show roster/timeline/context/r
 
 ## Second Serious Implementation Pass
 
-Issues 6-10:
+Issues 6-8:
 
 - add config-driven agent participants
 - connect LLM adapters for OpenAI/LiteLLM/local boundary
 - add context/workspace receipts and verification states
 - persist transcript/event history
 - generate handoff payloads
+
+Definition of done: MVP can run an end-to-end text workroom flow with real or mocked providers, preserve a transcript, generate local handoff output, and show context-linked receipts.
+
+## Third Serious Implementation Pass
+
+Issues 9-10:
+
 - implement first voice transport adapter path
 - add E2E tests and deploy docs
 
-Definition of done: MVP can run an end-to-end text workroom flow with real or mocked providers, preserve a transcript, generate handoff output, show receipts, and demonstrate voice transcript events through at least one configured voice adapter.
+Definition of done: MVP can demonstrate voice transcript events through at least one configured voice adapter and has E2E validation plus deployment-mode docs.
 
 ## GitHub Project Field Plan
 

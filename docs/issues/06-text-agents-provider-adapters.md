@@ -32,3 +32,11 @@ Optional live validation requires explicit approval and configured secrets.
 ## Notes For Codex
 
 Keep adapter boundaries clean so provider implementations can change without rewriting routing, UI, or persistence.
+
+## MVP Pass 2 Implementation Notes
+
+- `packages/agents-sdk` loads Hermes-backed persona metadata and fallback generic agents.
+- `packages/provider-adapters` exposes mock, OpenAI Responses, LiteLLM/OpenAI-compatible, and local HTTP LLM constructors.
+- The orchestrator selects mock/OpenAI/LiteLLM/local LLM providers from env without hardwiring one provider.
+- HTTP LLM provider calls use a configurable timeout and return room-visible blocked/error lifecycle events through the agent runtime.
+- Live provider calls are not required for local tests; mocked fetch tests cover request/response behavior.

@@ -24,6 +24,7 @@
     "react": "latest",
     "react-dom": "latest",
     "lucide-react": "latest",
+    "yaml": "latest",
     "zod": "latest",
     "ws": "latest"
   },

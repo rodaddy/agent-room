@@ -1,10 +1,43 @@
-import { participantSchema, type Participant } from "@agent-room/room-events";
+import {
+  AgentRuntime,
+  fallbackPersonas,
+  loadHermesPersonasSync,
+} from "@agent-room/agents-sdk";
+import {
+  createLiteLlmProvider,
+  createLocalHttpLlmProvider,
+  createMockLlmProvider,
+  createOpenAiResponsesLlmProvider,
+} from "@agent-room/provider-adapters";
+import {
+  createContextAttachedEvent,
+  SqliteStore,
+  type ContextItemRecord,
+} from "@agent-room/persistence";
+import {
+  createRoomEvent,
+  participantSchema,
+  type Participant,
+} from "@agent-room/room-events";
 import { createLogger } from "./logger";
-import { RoomHub } from "./room-hub";
+import {
+  createDemoRoutingConfig,
+  RoomHub,
+  type RoomEventStore,
+} from "./room-hub";
 
 export interface OrchestratorOptions {
   host?: string;
   port?: number;
+  store?: RoomEventStore & {
+    close?(): void;
+    exportTranscript?(roomId: string): {
+      artifactPath: string;
+      markdown: string;
+    };
+    upsertProviderConfig?(input: ProviderConfigInput): void;
+  };
+  personaRoot?: string;
 }
 
 export interface OrchestratorServer {
@@ -30,7 +63,25 @@ export function createOrchestratorServer(
   const port =
     options.port ??
     Number.parseInt(process.env.ORCHESTRATOR_PORT ?? "4000", 10);
-  const hub = new RoomHub();
+  const personas = loadPersonas(
+    options.personaRoot ?? process.env.AGENT_ROOM_PERSONA_ROOT,
+  );
+  const storeOptions: { databasePath?: string; artifactDir?: string } = {};
+  if (process.env.AGENT_ROOM_DB_PATH)
+    storeOptions.databasePath = process.env.AGENT_ROOM_DB_PATH;
+  if (process.env.AGENT_ROOM_ARTIFACT_DIR)
+    storeOptions.artifactDir = process.env.AGENT_ROOM_ARTIFACT_DIR;
+  const store = options.store ?? new SqliteStore(storeOptions);
+  seedProviderReferences(store);
+  const hub = new RoomHub({
+    routingConfig: createDemoRoutingConfig(personas),
+    personas,
+    store,
+    agentRuntime: new AgentRuntime({
+      personas,
+      llmProvider: createConfiguredLlmProvider(),
+    }),
+  });
   let websocketConnections = 0;
   let invalidEvents = 0;
 
@@ -51,8 +102,51 @@ export function createOrchestratorServer(
             },
           );
         }
+        if (url.pathname.match(/^\/rooms\/[^/]+\/context$/)) {
+          const auth = authorizeLocalRequest(request, url, { bindHost: host });
+          if (!auth.ok) {
+            return Response.json(
+              { ok: false, error: auth.reason },
+              { status: 401 },
+            );
+          }
+          return attachContext(request, url, hub);
+        }
+        if (url.pathname.match(/^\/rooms\/[^/]+\/transcript$/)) {
+          const auth = authorizeLocalRequest(request, url, { bindHost: host });
+          if (!auth.ok) {
+            return Response.json(
+              { ok: false, error: auth.reason },
+              { status: 401 },
+            );
+          }
+          const roomId = roomIdFromPath(url);
+          const transcript =
+            "exportTranscript" in store &&
+            typeof store.exportTranscript === "function"
+              ? store.exportTranscript(roomId)
+              : {
+                  artifactPath: "",
+                  markdown: renderTranscript(roomId, hub.history(roomId)),
+                };
+          const handoff = createRoomEvent({
+            id: crypto.randomUUID(),
+            roomId,
+            kind: "handoff.created",
+            from: "system:orchestrator",
+            payload: {
+              target: "local",
+              summary: `Local transcript exported for ${roomId}.`,
+              actionItems: [],
+              blockers: [],
+              artifactPath: transcript.artifactPath,
+            },
+          });
+          hub.publishSystem(roomId, handoff);
+          return Response.json({ ok: true, ...transcript });
+        }
         if (url.pathname.startsWith("/rooms/")) {
-          const auth = authorizeLocalRequest(request, url);
+          const auth = authorizeLocalRequest(request, url, { bindHost: host });
           if (!auth.ok) {
             logger.warn("local auth rejected websocket upgrade", {
               reason: auth.reason,
@@ -99,36 +193,38 @@ export function createOrchestratorServer(
         });
       },
       message(socket, message) {
-        try {
-          const raw = JSON.parse(String(message)) as Record<string, unknown>;
-          if (!clientWritableKinds.has(String(raw.kind))) {
-            throw new Error("unsupported client event kind");
+        void (async () => {
+          try {
+            const raw = JSON.parse(String(message)) as Record<string, unknown>;
+            if (!clientWritableKinds.has(String(raw.kind))) {
+              throw new Error("unsupported client event kind");
+            }
+            const payload = raw.payload;
+            if (!payload || typeof payload !== "object") {
+              throw new Error("invalid client payload");
+            }
+            const stamped = {
+              ...raw,
+              id: typeof raw.id === "string" ? raw.id : crypto.randomUUID(),
+              roomId: socket.data.roomId,
+              from: socket.data.participant.id,
+              to: [],
+              createdAt: new Date().toISOString(),
+              payload,
+            };
+            await hub.ingest(socket.data.roomId, stamped);
+          } catch (error) {
+            invalidEvents += 1;
+            logger.warn("invalid websocket message", {
+              error: error instanceof Error ? error.message : String(error),
+            });
+            hub.sendWarning(
+              socket.data.roomId,
+              socket,
+              "Invalid room event was rejected.",
+            );
           }
-          const payload = raw.payload;
-          if (!payload || typeof payload !== "object") {
-            throw new Error("invalid client payload");
-          }
-          const stamped = {
-            ...raw,
-            id: typeof raw.id === "string" ? raw.id : crypto.randomUUID(),
-            roomId: socket.data.roomId,
-            from: socket.data.participant.id,
-            to: [],
-            createdAt: new Date().toISOString(),
-            payload,
-          };
-          hub.ingest(socket.data.roomId, stamped);
-        } catch (error) {
-          invalidEvents += 1;
-          logger.warn("invalid websocket message", {
-            error: error instanceof Error ? error.message : String(error),
-          });
-          hub.sendWarning(
-            socket.data.roomId,
-            socket,
-            "Invalid room event was rejected.",
-          );
-        }
+        })();
       },
       close(socket) {
         hub.disconnect(socket.data.roomId, {
@@ -145,8 +241,127 @@ export function createOrchestratorServer(
     server,
     async stop() {
       server.stop(true);
+      store.close?.();
     },
   };
+}
+
+async function attachContext(
+  request: Request,
+  url: URL,
+  hub: RoomHub,
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return Response.json(
+      { ok: false, error: "method not allowed" },
+      { status: 405 },
+    );
+  }
+  const body = (await request.json()) as Partial<ContextItemRecord>;
+  const roomId = roomIdFromPath(url);
+  const contextInput: Parameters<typeof createContextAttachedEvent>[0] = {
+    roomId,
+    from: "human:rico",
+    contextId: body.contextId ?? crypto.randomUUID(),
+    name: body.name ?? "Untitled context",
+    kind: body.kind ?? "snippet",
+  };
+  if (body.preview) contextInput.preview = body.preview;
+  if (typeof body.bytes === "number") contextInput.bytes = body.bytes;
+  const event = createContextAttachedEvent(contextInput);
+  hub.publishSystem(roomId, event);
+  return Response.json({ ok: true, event });
+}
+
+function roomIdFromPath(url: URL): string {
+  return url.pathname.split("/")[2] ?? "demo";
+}
+
+function loadPersonas(root: string | undefined) {
+  if (!root) {
+    return fallbackPersonas();
+  }
+  try {
+    const personas = loadHermesPersonasSync(root);
+    if (personas.length === 0) {
+      return fallbackPersonas();
+    }
+    const configuredIds = new Set(
+      personas.map((persona) => persona.participantId),
+    );
+    return [
+      ...personas,
+      ...fallbackPersonas().filter(
+        (persona) => !configuredIds.has(persona.participantId),
+      ),
+    ];
+  } catch {
+    return fallbackPersonas();
+  }
+}
+
+interface ProviderConfigInput {
+  id: string;
+  provider: string;
+  mode: "mock" | "openai" | "litellm" | "local";
+  secretRef?: string;
+  baseUrl?: string;
+  enabled?: boolean;
+}
+
+function seedProviderReferences(store: {
+  upsertProviderConfig?: (input: ProviderConfigInput) => void;
+}): void {
+  store.upsertProviderConfig?.({
+    id: "openai",
+    provider: "openai",
+    mode: "openai",
+    secretRef: "vaultwarden://agent-room/openai-api-key",
+    enabled: Boolean(process.env.OPENAI_API_KEY),
+  });
+  const litellmConfig: ProviderConfigInput = {
+    id: "litellm",
+    provider: "litellm",
+    mode: "litellm",
+    secretRef: "vaultwarden://agent-room/litellm-api-key",
+    enabled: Boolean(process.env.LITELLM_BASE_URL),
+  };
+  if (process.env.LITELLM_BASE_URL)
+    litellmConfig.baseUrl = process.env.LITELLM_BASE_URL;
+  store.upsertProviderConfig?.(litellmConfig);
+}
+
+function createConfiguredLlmProvider() {
+  const explicitProvider = process.env.LLM_PROVIDER?.toLowerCase();
+  if (explicitProvider === "openai" || process.env.OPENAI_API_KEY) {
+    return createOpenAiResponsesLlmProvider();
+  }
+  if (explicitProvider === "litellm" || process.env.LITELLM_BASE_URL) {
+    return createLiteLlmProvider();
+  }
+  if (explicitProvider === "local" || process.env.LOCAL_MODEL_BASE_URL) {
+    return createLocalHttpLlmProvider();
+  }
+  return createMockLlmProvider("mock-llm");
+}
+
+function renderTranscript(
+  roomId: string,
+  history: {
+    from: string;
+    createdAt: string;
+    payload: Record<string, unknown>;
+  }[],
+): string {
+  return [
+    `# Agent Room Transcript: ${roomId}`,
+    "",
+    ...history.map(
+      (event) =>
+        `- ${event.createdAt} ${event.from}: ${typeof event.payload.text === "string" ? event.payload.text : JSON.stringify(event.payload)}`,
+    ),
+    "",
+  ].join("\n");
 }
 
 function renderMetrics(
@@ -166,12 +381,14 @@ function renderMetrics(
 export function authorizeLocalRequest(
   request: Request,
   url: URL,
+  options: { bindHost?: string } = {},
 ): { ok: true } | { ok: false; reason: string } {
   const configuredToken = process.env.ORCHESTRATOR_LOCAL_TOKEN;
   const allowUnauthenticatedLocal =
     process.env.ALLOW_UNAUTHENTICATED_LOCAL !== "0";
   if (!configuredToken && allowUnauthenticatedLocal) {
-    return isLoopbackHost(url.hostname)
+    return isLoopbackHost(options.bindHost ?? url.hostname) &&
+      isLoopbackHost(url.hostname)
       ? { ok: true }
       : { ok: false, reason: "local session token required" };
   }
@@ -183,7 +400,13 @@ export function authorizeLocalRequest(
     .get("authorization")
     ?.replace(/^Bearer\s+/i, "");
   const queryToken = url.searchParams.get("sessionToken");
-  if (bearer === configuredToken || queryToken === configuredToken) {
+  const allowQueryToken =
+    isLoopbackHost(options.bindHost ?? url.hostname) &&
+    isLoopbackHost(url.hostname);
+  if (
+    bearer === configuredToken ||
+    (allowQueryToken && queryToken === configuredToken)
+  ) {
     return { ok: true };
   }
 

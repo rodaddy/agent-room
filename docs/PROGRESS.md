@@ -32,3 +32,39 @@ Validation evidence:
 - Frontend re-verification job `76f056ee-6883-4a60-8c16-258c1520a090`: reported `zero_known_material_issues`.
 
 Browser visual check note: the in-app Browser plugin reported `iab` unavailable in this session, so visual verification used build plus local HTTP response only.
+
+## 2026-06-15 MVP Pass 2
+
+- Controller branch: `codex/mvp-pass-2`.
+- Scope: issues #6, #7, and #8 only. Voice adapters (#9) and full deployment/E2E docs (#10) remain next-pass work.
+- Added SQLite persistence with canonical `room_events` replay plus projection tables for messages, dispatches, receipts, context, handoffs, identities, room membership, API key hashes, and provider config references.
+- Added config-driven agent loading from Hermes backup metadata for Bilby, Skippy, and Nagatha, with generic fallback agents merged into local demo routing.
+- Added provider-backed agent runtime that defaults to mock locally, selects OpenAI Responses/LiteLLM/local HTTP LLM providers from env when configured, and emits dispatch lifecycle events, blocked states, and provider receipts with context counts.
+- Added context snippet attach, selected context chips, receipt artifact chips, persisted context API, and local transcript export/handoff hooks to the web/orchestrator flow.
+- Added local secret boundary: secret values stay in Vaultwarden; SQLite stores hashes and `vaultwarden://agent-room/...` references.
+- Created Vaultwarden secure notes for `Agent Room - Admin API Key` and `Agent Room - Orchestrator Local Token`; seeded a temporary SQLite DB under `/Volumes/ThunderBolt/_tmp/agent-room-runtime` with only refs and token hashes.
+- Runtime smoke validation used `/Volumes/ThunderBolt/_tmp/agent-room-runtime` for SQLite and transcript artifacts; repo-local `data/` is ignored for user-run local persistence and was not used for Codex validation.
+- Review gate findings were fixed:
+  - HTTP LLM providers now use `LLM_PROVIDER_TIMEOUT_MS`/AbortController and return `provider_timeout` errors instead of hanging dispatches.
+  - Duplicate room event ids no longer re-project different payloads over the canonical event log.
+  - Unauthenticated local mode now requires both bind host and request URL to be loopback, preventing Host-header spoof bypass on exposed binds.
+  - `sessionToken` query auth is restricted to loopback development; exposed/non-loopback use requires bearer auth.
+  - `docs/issue-backlog.md` now splits pass 2 (#6-#8) from pass 3 (#9-#10).
+
+Validation evidence:
+
+- `bun test packages/provider-adapters/src/index.test.ts`: 9 tests passed.
+- `bun run format`: passed.
+- `bun run typecheck`: passed.
+- `bun run lint`: passed via typecheck-backed lint placeholder.
+- `bun run test`: 42 source tests passed.
+- `bun run build`: passed, including Vite production build.
+- `git diff --check`: passed.
+- `ggshield secret scan repo .`: passed.
+- `curl -fsS http://127.0.0.1:4000/health`: returned `{"ok":true,"service":"orchestrator"}` while `bun run dev` was running.
+- `curl -fsS http://127.0.0.1:3000`: returned the Vite app shell while `bun run dev` was running.
+- `POST /rooms/demo/context`: returned persisted `context.attached` event for `ctx_smoke`.
+- `GET /rooms/demo/transcript`: returned `ok: true` and wrote markdown under `/Volumes/ThunderBolt/_tmp/agent-room-runtime/smoke-artifacts/`.
+- Post-review smoke rerun: `curl` health/web/context/transcript passed and wrote markdown under `/Volumes/ThunderBolt/_tmp/agent-room-runtime/smoke2-artifacts/`.
+- Focused fix verification job `5339dfda-2597-4592-ace6-adc64ab440a5`: correctness, security, and docs lanes all reported `pass` with zero remaining findings for the prior review items.
+- Browser visual smoke: skipped because Playwright was available but its Chromium binary was not installed; no browser download was performed during this pass.

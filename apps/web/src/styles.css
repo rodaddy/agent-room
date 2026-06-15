@@ -170,7 +170,10 @@ h2 {
 }
 
 .voice-bar button,
-.composer button {
+.composer button,
+.context-editor button,
+.context-item button,
+.context-chip {
   align-items: center;
   background: rgba(28, 38, 54, 0.95);
   border: 1px solid rgba(126, 154, 174, 0.28);
@@ -180,6 +183,16 @@ h2 {
   height: 36px;
   justify-content: center;
   width: 36px;
+}
+
+.context-editor button,
+.context-item button,
+.context-chip {
+  gap: 5px;
+  height: auto;
+  min-height: 30px;
+  padding: 5px 8px;
+  width: auto;
 }
 
 .voice-bar .active {
@@ -252,6 +265,12 @@ h2 {
   padding: 3px 8px;
 }
 
+.context-chip {
+  border-color: rgba(124, 199, 255, 0.4);
+  color: #9ed8ff;
+  margin-right: 6px;
+}
+
 .receipt-provider-reported,
 .receipt-manual {
   border-color: rgba(180, 140, 255, 0.45);
@@ -308,11 +327,28 @@ textarea {
   margin-bottom: 18px;
 }
 
+.context-editor {
+  border-bottom: 1px solid rgba(126, 154, 174, 0.14);
+  display: grid;
+  gap: 8px;
+  margin-bottom: 8px;
+  padding-bottom: 12px;
+}
+
+.context-editor textarea {
+  min-height: 94px;
+}
+
 .context-item {
   border-bottom: 1px solid rgba(126, 154, 174, 0.14);
   display: grid;
   gap: 4px;
   padding: 12px 0;
+}
+
+.context-selected {
+  border-left: 3px solid rgba(94, 231, 135, 0.65);
+  padding-left: 8px;
 }
 
 .preview {

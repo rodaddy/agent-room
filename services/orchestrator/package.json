@@ -5,11 +5,15 @@
   "type": "module",
   "main": "src/server.ts",
   "scripts": {
+    "bootstrap:local-secrets": "bun run src/bootstrap-local-secrets.ts",
     "dev": "bun run src/server.ts",
     "test": "bun test",
     "typecheck": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@agent-room/agents-sdk": "workspace:*",
+    "@agent-room/persistence": "workspace:*",
+    "@agent-room/provider-adapters": "workspace:*",
     "@agent-room/room-events": "workspace:*",
     "@agent-room/routing": "workspace:*",
     "ws": "latest"

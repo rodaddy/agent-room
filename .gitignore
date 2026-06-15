@@ -1,4 +1,5 @@
 node_modules/
+.DS_Store
 dist/
 build/
 .vite/
@@ -10,3 +11,7 @@ playwright-report/
 test-results/
 *.log
 *.tsbuildinfo
+data/
+*.sqlite
+*.sqlite-shm
+*.sqlite-wal
