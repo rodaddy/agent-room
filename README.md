@@ -1,137 +1,93 @@
-# Agent Room
+# Agent Room / Voice Workroom
 
-Realtime multi-agent chat workspace for humans and AI agents to work together in one room.
+Agent Room is a browser workroom where Rico can type or speak with multiple named AI agents, route work explicitly, watch progress and receipts, preserve transcripts, and hand off outcomes to Hermes, Discord, or local artifacts.
 
-## What it is
+The canonical product plan is [docs/PRD.md](docs/PRD.md). Current implementation work should follow the PRD, [docs/architecture.md](docs/architecture.md), and the issue specs in [docs/issues/](docs/issues/).
 
-Agent Room is a web app where a human can chat with multiple specialized agents in the same thread, route work with `@agent` and `@all`, inspect code or attached context, and optionally talk over voice.
+## Product Principles
 
-The whole point is visible collaboration:
-- human messages stay in the room
-- agent actions and receipts stay in the room
-- routing is explicit
-- DAP handles agent-to-agent coordination behind the scenes
-- voice is first-class, not bolted on later
+- Room events are the product core.
+- Voice is an input/output transport attached to the same room state as text.
+- Agents are config-driven participants, not hard-coded branches.
+- Routing is deterministic: `@agent`, `@all`, explicit names, `both`, and interrupt commands have testable behavior.
+- Receipts and verification are separate from natural-language claims.
+- Provider adapters are swappable across OpenAI, LiteLLM, local model, Whisper, Edge/Kokoro/macOS TTS, OpenAI Realtime, and LiveKit/WebRTC paths.
 
-## MVP goals
+## MVP UX
 
-- Shared room timeline with human + agent messages
-- `@all` broadcast and `@agent-name` direct routing
-- visible agent states: idle, reading, thinking, answering, blocked
-- file/context panel for pasted code, uploaded files, and repo snippets
-- text agents via OpenAI Responses API
-- voice sessions via OpenAI Realtime API
-- DAP envelopes and receipts for inter-agent work
-- persistent rooms, messages, and participants
+The first useful screen is the room:
 
-## Suggested stack
+- roster rail for Rico, Moderator, Bilby/Skippy, and generic roles like builder/scribe/scout/tester
+- transcript timeline with human messages, agent replies, voice transcripts, moderator events, receipts, and errors
+- mention-aware composer with context attachments and routing preview
+- voice controls for connect, push/hold-to-talk, spoken response, and interrupt/hold
+- context/workspace panel for snippets, files, references, and receipt-linked artifacts
 
-### Frontend
-- Next.js 16
+## Deployment Modes
+
+Cloud/API mode uses hosted OpenAI text, STT/TTS, and optionally Realtime behind the same room-event interfaces.
+
+Mac mini M4 local/hybrid mode runs the app locally with local/browser STT, Edge/macOS/Kokoro TTS, LiteLLM or local model routing, and no hard dependency on homelab LiveKit.
+
+Homelab mode uses LiveKit/WebRTC, LiteLLM-first reasoning, local STT/TTS, transcript storage, and Hermes/Discord handoff. Live host/IP/credential changes require separate approval and verification.
+
+## Suggested Stack
+
+- Bun workspace
 - TypeScript
-- Tailwind
-- shadcn/ui
-- Zustand or TanStack Query for client state
+- `apps/web` for the room UI
+- `services/orchestrator` for routing, room events, agent lifecycle, and provider brokering
+- shared packages for event schemas, provider interfaces, agents, voice, persistence, UI, and workspace receipts
+- Postgres for durable state
+- Redis or equivalent for presence/fanout when needed
 
-### Backend
-- Node.js + TypeScript
-- Fastify or Hono for the orchestrator service
-- WebSocket gateway for room events
-- Postgres for persistence
-- Redis for presence, fanout, and transient coordination
-
-### AI + voice
-- OpenAI Responses API for text turns
-- OpenAI Realtime API for voice streaming
-- DAP transport over NATS or Redis Streams
-
-## Monorepo shape
+## Planned Monorepo Shape
 
 ```text
 apps/
-  web/                  Next.js app
+  web/
 services/
-  orchestrator/         room logic, agent routing, tool broker
+  orchestrator/
 packages/
-  dap-contracts/        schemas for DAP envelopes and receipts
-  ui/                   shared UI components
-  agents-sdk/           agent adapter helpers
+  room-events/
+  provider-adapters/
+  agents-sdk/
+  voice/
+  persistence/
+  workspace/
+  ui/
 docs/
+  PRD.md
   architecture.md
   issue-backlog.md
   issues/
 ```
 
-## Core product behaviors
+## Local Setup Target
 
-### Routing
-- `@all summarize this file` sends one human message and fans out agent tasks
-- `@frontend` or `@research` targets one agent directly
-- agent replies include receipts showing what they touched or read
-
-### Observable collaboration
-- timeline shows dispatch, started, tool-use receipt, answer, blocked state
-- agents can hand work to each other through DAP messages
-- humans can see why an answer took time
-
-### Voice
-- push-to-talk or hold-to-talk
-- live transcript in room
-- optional spoken agent replies
-- voice session links to the same room state as text
-
-## DAP envelope sketch
-
-```json
-{
-  "id": "msg_123",
-  "roomId": "room_abc",
-  "kind": "task.dispatch",
-  "from": "human:rico",
-  "to": ["agent:frontend", "agent:backend"],
-  "replyTo": "msg_122",
-  "body": {
-    "text": "@frontend @backend figure out why auth breaks in Safari"
-  },
-  "context": {
-    "attachments": [],
-    "codeRefs": []
-  },
-  "createdAt": "2026-06-15T13:30:46-04:00"
-}
-```
-
-## Fast Codex build strategy
-
-Build in vertical slices, not layers:
-1. room UI + local mock transport
-2. real WebSocket timeline
-3. orchestrator routing for `@agent` and `@all`
-4. OpenAI text agents
-5. DAP receipts and handoff flow
-6. voice room
-7. persistence and auth
-
-That keeps each issue independently Codex-able.
-
-## Local setup target
-
-Use bun for workspace tasks.
+The scaffold issue will make these commands real:
 
 ```bash
 bun install
 bun run dev
+bun run typecheck
+bun run lint
+bun run test
+bun run test:e2e
 ```
 
-Planned apps/services will define the actual scripts as they land.
+Until then, treat them as the intended validation contract.
 
-## Repo workflow for implementation
+## Implementation Strategy
 
-- start from `main`
-- create one branch per issue
-- let Codex work issue-by-issue with the issue body as the prompt seed
-- keep PRs vertical and demoable
+Build vertical slices:
 
-## Initial issue set
+1. scaffold, room event contracts, and mock providers
+2. room UI with mock event timeline
+3. orchestrator WebSocket protocol and deterministic routing
+4. config-driven text agents through provider adapters
+5. context/workspace receipts and transcript persistence
+6. voice transport adapter path
+7. handoff, E2E validation, and deployment docs
 
-See `docs/issue-backlog.md` and `docs/issues/`.
+See [docs/issue-backlog.md](docs/issue-backlog.md) for the MVP issue map.
