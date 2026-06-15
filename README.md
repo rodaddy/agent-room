@@ -63,9 +63,9 @@ docs/
   issues/
 ```
 
-## Local Setup Target
+## Local Setup
 
-The scaffold issue will make these commands real:
+Use Bun for workspace tasks.
 
 ```bash
 bun install
@@ -76,7 +76,9 @@ bun run test
 bun run test:e2e
 ```
 
-Until then, treat them as the intended validation contract.
+`bun run dev` starts the orchestrator and web UI together. For split terminals, use `bun run dev:orchestrator` and `bun run dev:web`.
+
+Copy `.env.example` when local configuration is needed. The orchestrator allows unauthenticated WebSocket upgrades only on loopback by default; set `ORCHESTRATOR_LOCAL_TOKEN` before exposing it beyond `127.0.0.1`/`localhost`.
 
 ## Implementation Strategy
 

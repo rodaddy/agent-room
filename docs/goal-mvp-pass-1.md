@@ -20,6 +20,8 @@ If PR #11 is merged, start from fresh `main` and immediately branch. If it is no
 
 Never work on `main`. First implementation action is to get off `main` into a focused branch or WIP branch. Flow is branch, work, commit, push, PR, review/validation, merge, pull fresh `main`, new branch.
 
+If the queue is empty, create a WIP branch anyway before any edit so the working tree is never modified on `main`.
+
 ## MVP Pass 1 Scope
 
 Implement issues #1-#5 as one vertical slice unless evidence shows a split is safer:
