@@ -1,15 +1,40 @@
 {
   "name": "agent-room",
   "private": true,
-  "packageManager": "bun@1.2.17",
+  "packageManager": "bun@1.3.13",
   "workspaces": [
     "apps/*",
     "services/*",
     "packages/*"
   ],
   "scripts": {
-    "dev": "echo 'scaffold only - issue branches will add runnable apps'",
-    "lint": "echo 'not wired yet'",
-    "test": "echo 'not wired yet'"
+    "dev": "bun run --parallel dev:orchestrator dev:web",
+    "dev:web": "bun run --cwd apps/web dev",
+    "dev:orchestrator": "bun run --cwd services/orchestrator dev",
+    "build": "tsc -b && bun run --cwd apps/web build",
+    "typecheck": "tsc -b",
+    "lint": "bun run typecheck",
+    "test": "find packages services -path '*/src/*.test.ts' -print | xargs bun test",
+    "test:e2e": "bun run test",
+    "format": "prettier --check ."
+  },
+  "dependencies": {
+    "@vitejs/plugin-react": "latest",
+    "vite": "latest",
+    "react": "latest",
+    "react-dom": "latest",
+    "lucide-react": "latest",
+    "zod": "latest",
+    "ws": "latest"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/react": "latest",
+    "@types/react-dom": "latest",
+    "@types/ws": "latest",
+    "@tailwindcss/vite": "latest",
+    "prettier": "latest",
+    "tailwindcss": "latest",
+    "typescript": "latest"
   }
 }

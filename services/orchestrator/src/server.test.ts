@@ -1,0 +1,191 @@
+import { afterEach, beforeEach, describe, expect, test } from "bun:test";
+import { createRoomEvent, type RoomEvent } from "@agent-room/room-events";
+import {
+  authorizeLocalRequest,
+  createOrchestratorServer,
+  type OrchestratorServer,
+} from "./server";
+
+let orchestrator: OrchestratorServer | undefined;
+
+beforeEach(() => {
+  orchestrator = createOrchestratorServer({ host: "127.0.0.1", port: 0 });
+});
+
+afterEach(async () => {
+  await orchestrator?.stop();
+  orchestrator = undefined;
+});
+
+describe("orchestrator websocket rooms", () => {
+  test("fans out message, routing, and dispatch events to two clients", async () => {
+    const first = await connect("demo", "rico");
+    const second = await connect("demo", "observer");
+    await waitForEvent(first, "participant.joined");
+    await waitForEvent(second, "participant.joined");
+    first.socket.send(
+      JSON.stringify(
+        createRoomEvent({
+          id: "evt_test",
+          roomId: "demo",
+          kind: "message.created",
+          from: "human:rico",
+          payload: { text: "@bilby status" },
+        }),
+      ),
+    );
+
+    expect((await waitForEvent(first, "message.created")).id).toBe("evt_test");
+    expect((await waitForEvent(second, "message.created")).id).toBe("evt_test");
+    expect((await waitForEvent(second, "routing.resolved")).to).toEqual([
+      "agent:bilby",
+    ]);
+    expect((await waitForEvent(second, "agent.dispatch")).to).toEqual([
+      "agent:bilby",
+    ]);
+    first.socket.close();
+    second.socket.close();
+  });
+
+  test("invalid input returns a sanitized visible warning", async () => {
+    const client = await connect("demo", "rico");
+    await waitForEvent(client, "participant.joined");
+    client.socket.send(
+      JSON.stringify({ kind: "receipt.created", payload: { label: "forged" } }),
+    );
+    const warning = await waitForEvent(client, "routing.warning");
+    expect(warning.payload.warnings).toEqual([
+      "Invalid room event was rejected.",
+    ]);
+    client.socket.close();
+  });
+
+  test("health endpoint stays available for local smoke checks", async () => {
+    if (!orchestrator) {
+      throw new Error("test server not started");
+    }
+    const response = await fetch(
+      `http://127.0.0.1:${orchestrator.server.port}/health`,
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      ok: true,
+      service: "orchestrator",
+    });
+  });
+});
+
+describe("local auth boundary", () => {
+  const originalToken = process.env.ORCHESTRATOR_LOCAL_TOKEN;
+  const originalAllow = process.env.ALLOW_UNAUTHENTICATED_LOCAL;
+
+  afterEach(() => {
+    restoreEnv("ORCHESTRATOR_LOCAL_TOKEN", originalToken);
+    restoreEnv("ALLOW_UNAUTHENTICATED_LOCAL", originalAllow);
+  });
+
+  test("no-token mode is limited to loopback URLs", () => {
+    process.env.ORCHESTRATOR_LOCAL_TOKEN = "";
+    process.env.ALLOW_UNAUTHENTICATED_LOCAL = "1";
+
+    expect(
+      authorizeLocalRequest(
+        new Request("http://127.0.0.1/rooms/demo"),
+        new URL("http://127.0.0.1/rooms/demo"),
+      ),
+    ).toEqual({
+      ok: true,
+    });
+    expect(
+      authorizeLocalRequest(
+        new Request("http://agent-room.local/rooms/demo"),
+        new URL("http://agent-room.local/rooms/demo"),
+      ),
+    ).toEqual({
+      ok: false,
+      reason: "local session token required",
+    });
+  });
+
+  test("configured local token accepts bearer or websocket query token", () => {
+    process.env.ORCHESTRATOR_LOCAL_TOKEN = "test-token";
+    process.env.ALLOW_UNAUTHENTICATED_LOCAL = "0";
+
+    expect(
+      authorizeLocalRequest(
+        new Request("http://agent-room.local/rooms/demo", {
+          headers: { authorization: "Bearer test-token" },
+        }),
+        new URL("http://agent-room.local/rooms/demo"),
+      ),
+    ).toEqual({ ok: true });
+    expect(
+      authorizeLocalRequest(
+        new Request(
+          "http://agent-room.local/rooms/demo?sessionToken=test-token",
+        ),
+        new URL("http://agent-room.local/rooms/demo?sessionToken=test-token"),
+      ),
+    ).toEqual({ ok: true });
+    expect(
+      authorizeLocalRequest(
+        new Request("http://agent-room.local/rooms/demo?sessionToken=bad"),
+        new URL("http://agent-room.local/rooms/demo?sessionToken=bad"),
+      ),
+    ).toEqual({ ok: false, reason: "invalid local session" });
+  });
+});
+
+function restoreEnv(name: string, value: string | undefined): void {
+  if (value === undefined) {
+    delete process.env[name];
+    return;
+  }
+  process.env[name] = value;
+}
+
+async function connect(
+  roomId: string,
+  participantId: string,
+): Promise<TestClient> {
+  if (!orchestrator) {
+    throw new Error("test server not started");
+  }
+  const socket = new WebSocket(
+    `ws://127.0.0.1:${orchestrator.server.port}/rooms/${roomId}?participantId=${participantId}`,
+  );
+  const events: RoomEvent[] = [];
+  socket.addEventListener("message", (message) => {
+    events.push(JSON.parse(String(message.data)) as RoomEvent);
+  });
+  await new Promise<void>((resolve, reject) => {
+    socket.addEventListener("open", () => resolve(), { once: true });
+    socket.addEventListener(
+      "error",
+      () => reject(new Error("websocket connection failed")),
+      { once: true },
+    );
+  });
+  return { socket, events };
+}
+
+interface TestClient {
+  socket: WebSocket;
+  events: RoomEvent[];
+}
+
+async function waitForEvent(
+  client: TestClient,
+  kind: string,
+): Promise<RoomEvent> {
+  const deadline = Date.now() + 1_000;
+  while (Date.now() < deadline) {
+    const event = client.events.find((candidate) => candidate.kind === kind);
+    if (event) {
+      client.events.splice(client.events.indexOf(event), 1);
+      return event;
+    }
+    await Bun.sleep(10);
+  }
+  throw new Error(`timed out waiting for ${kind}`);
+}
