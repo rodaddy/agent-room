@@ -113,6 +113,7 @@ export const contextPayloadSchema = z.object({
   kind: z.enum(["snippet", "file", "url", "note"]),
   preview: z.string().optional(),
   bytes: z.number().int().nonnegative().optional(),
+  artifactPath: z.string().optional(),
 });
 
 export const voiceSessionPayloadSchema = z.object({

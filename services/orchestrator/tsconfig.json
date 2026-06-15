@@ -6,6 +6,9 @@
     "tsBuildInfoFile": "dist/tsconfig.tsbuildinfo"
   },
   "references": [
+    { "path": "../../packages/agents-sdk" },
+    { "path": "../../packages/persistence" },
+    { "path": "../../packages/provider-adapters" },
     { "path": "../../packages/room-events" },
     { "path": "../../packages/routing" }
   ],

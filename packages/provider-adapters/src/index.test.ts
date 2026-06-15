@@ -2,10 +2,13 @@ import { describe, expect, test } from "bun:test";
 import { z } from "zod";
 import {
   blockedProviderResult,
+  createLiteLlmProvider,
+  createLocalHttpLlmProvider,
   createMockLlmProvider,
   createMockSttProvider,
   createMockTtsProvider,
   createMockVoiceRoomProvider,
+  createOpenAiResponsesLlmProvider,
   normalizeProviderResult,
 } from "./index";
 
@@ -29,6 +32,103 @@ describe("provider adapters", () => {
     );
     expect(result.status).toBe("blocked");
     expect(result.issue?.code).toBe("provider_unavailable");
+  });
+
+  test("OpenAI Responses provider blocks safely without a key", async () => {
+    const provider = createOpenAiResponsesLlmProvider({ apiKey: "" });
+    const result = await provider.complete({
+      roomId: "demo",
+      agentId: "agent:skippy",
+      prompt: "hello",
+    });
+
+    expect(result.status).toBe("blocked");
+    expect(result.issue?.message).toBe("OPENAI_API_KEY is not configured.");
+  });
+
+  test("OpenAI Responses provider parses output text", async () => {
+    const requests: unknown[] = [];
+    const provider = createOpenAiResponsesLlmProvider({
+      apiKey: "test-key",
+      baseUrl: "https://example.test/v1/",
+      model: "test-model",
+      fetchFn: async (url, init) => {
+        requests.push({ url, init });
+        return Response.json({ output_text: "done" });
+      },
+    });
+
+    const result = await provider.complete({
+      roomId: "demo",
+      agentId: "agent:bilby",
+      prompt: "summarize",
+      context: [{ id: "ctx_1", text: "keep receipts" }],
+    });
+
+    expect(result.status).toBe("ok");
+    expect(result.value?.text).toBe("done");
+    expect(requests).toHaveLength(1);
+    expect(JSON.stringify(requests[0])).toContain(
+      "https://example.test/v1/responses",
+    );
+    expect(JSON.stringify(requests[0])).toContain("ctx_1");
+  });
+
+  test("LiteLLM and local providers use OpenAI-compatible chat completions", async () => {
+    const urls: string[] = [];
+    const fetchFn = async (url: Parameters<typeof fetch>[0]) => {
+      urls.push(String(url));
+      return Response.json({
+        choices: [{ message: { content: "compatible response" } }],
+      });
+    };
+
+    const litellm = await createLiteLlmProvider({
+      baseUrl: "http://litellm.test",
+      apiKey: "test-key",
+      fetchFn,
+    }).complete({
+      roomId: "demo",
+      agentId: "agent:skippy",
+      prompt: "route",
+    });
+    const local = await createLocalHttpLlmProvider({
+      baseUrl: "http://local-model.test/",
+      fetchFn,
+    }).complete({
+      roomId: "demo",
+      agentId: "agent:tester",
+      prompt: "check",
+    });
+
+    expect(litellm.value?.text).toBe("compatible response");
+    expect(local.value?.text).toBe("compatible response");
+    expect(urls).toEqual([
+      "http://litellm.test/chat/completions",
+      "http://local-model.test/chat/completions",
+    ]);
+  });
+
+  test("HTTP LLM providers return a timeout result instead of hanging", async () => {
+    const provider = createLiteLlmProvider({
+      baseUrl: "http://litellm.test",
+      timeoutMs: 1,
+      fetchFn: (_url, init) =>
+        new Promise<Response>((_resolve, reject) => {
+          init?.signal?.addEventListener("abort", () =>
+            reject(new DOMException("aborted", "AbortError")),
+          );
+        }),
+    });
+
+    const result = await provider.complete({
+      roomId: "demo",
+      agentId: "agent:skippy",
+      prompt: "hang",
+    });
+
+    expect(result.status).toBe("error");
+    expect(result.issue?.code).toBe("provider_timeout");
   });
 
   test("mock voice room creates session without live provider", async () => {

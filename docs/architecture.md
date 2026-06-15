@@ -24,7 +24,7 @@ Provider adapters
   -> voice room: OpenAI Realtime, LiveKit/WebRTC
 
 Persistence and handoff
-  -> Postgres/local store
+  -> SQLite local store
   -> transcript artifacts
   -> Hermes/Discord payloads
 ```
@@ -76,13 +76,13 @@ Owns stable interfaces and provider implementations:
 - `TtsProvider`
 - `VoiceRoomProvider`
 - provider config validation
-- normalized error and timeout behavior
+- normalized error and timeout behavior through `LLM_PROVIDER_TIMEOUT_MS`
 
 ### `packages/agents-sdk`
 
 Owns:
 
-- config-driven persona loading
+- config-driven persona loading from Hermes backup metadata and local fallbacks
 - agent turn execution
 - prompt/context assembly
 - lifecycle event emission
@@ -110,8 +110,10 @@ Owns:
 
 Owns:
 
-- schema/migrations
+- SQLite schema/migrations for the local MVP
 - room, participant, message, event, receipt, context, voice session, and handoff storage
+- local API key hash storage and Vaultwarden secret references
+- transcript artifact export
 
 ## Room Event Flow
 
@@ -170,12 +172,20 @@ Minimum durable entities:
 - context_items
 - voice_sessions
 - handoffs
+- identities
+- room_members
+- api_keys
+- provider_configs
 
 The event log is the replay source. Tables optimized for views can be derived from the event log when useful.
+
+For the MVP, SQLite is the local source of replayable state. Secret material is never stored in SQLite; rows may store one-way API key hashes and non-secret Vaultwarden refs such as `vaultwarden://agent-room/orchestrator-local-token`.
 
 ## Security Boundaries
 
 - Provider secrets stay server-side.
+- Vaultwarden stores local API keys/provider secrets; SQLite stores hashes and references only.
+- Durable local tokens are accepted through bearer auth for exposed use; query-string tokens are loopback-development only.
 - Browser receives short-lived room/voice tokens only.
 - Adapter errors are sanitized before becoming room events.
 - Receipts must not include secret values.

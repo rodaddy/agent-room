@@ -22,6 +22,8 @@
       "@agent-room/provider-adapters": [
         "packages/provider-adapters/src/index.ts"
       ],
+      "@agent-room/agents-sdk": ["packages/agents-sdk/src/index.ts"],
+      "@agent-room/persistence": ["packages/persistence/src/index.ts"],
       "@agent-room/routing": ["packages/routing/src/index.ts"]
     },
     "resolveJsonModule": true,

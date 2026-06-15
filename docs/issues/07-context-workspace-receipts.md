@@ -32,3 +32,10 @@ Manual check: attach a snippet, send a routed message, and verify timeline/conte
 ## Notes For Codex
 
 Start with local uploads or text snippets. Keep repo browsing and write actions out of MVP unless a later issue explicitly scopes them.
+
+## MVP Pass 2 Implementation Notes
+
+- The workspace panel supports local snippet attachment and selected context chips.
+- Message events carry `contextIds`; agent dispatch context is assembled from persisted context records.
+- Timeline rows render context links and receipt artifact chips.
+- File browsing/write actions remain out of scope for this MVP slice.

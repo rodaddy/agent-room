@@ -3,7 +3,7 @@ import { createRoomEvent } from "@agent-room/room-events";
 import { RoomHub, type ClientSession } from "./room-hub";
 
 describe("RoomHub", () => {
-  test("fans out routed dispatch events for a message", () => {
+  test("fans out routed dispatch events for a message", async () => {
     const sent: string[] = [];
     const hub = new RoomHub();
     const session = {
@@ -22,7 +22,7 @@ describe("RoomHub", () => {
     } satisfies ClientSession;
 
     hub.connect("demo", session);
-    hub.ingest(
+    await hub.ingest(
       "demo",
       createRoomEvent({
         id: "evt_1",
@@ -47,9 +47,11 @@ describe("RoomHub", () => {
     ).toBe(true);
   });
 
-  test("invalid events fail at the boundary", () => {
+  test("invalid events fail at the boundary", async () => {
     const hub = new RoomHub();
-    expect(() => hub.ingest("demo", { kind: "message.created" })).toThrow();
+    await expect(
+      hub.ingest("demo", { kind: "message.created" }),
+    ).rejects.toThrow();
   });
 
   test("disconnect removes the stored client session", () => {
@@ -76,7 +78,7 @@ describe("RoomHub", () => {
     expect(hub.clientCount("demo")).toBe(0);
   });
 
-  test("rejects room id spoofing", () => {
+  test("rejects room id spoofing", async () => {
     const hub = new RoomHub();
     const event = createRoomEvent({
       id: "evt_spoof",
@@ -86,6 +88,6 @@ describe("RoomHub", () => {
       payload: { text: "@bilby status" },
     });
 
-    expect(() => hub.ingest("demo", event)).toThrow("room mismatch");
+    await expect(hub.ingest("demo", event)).rejects.toThrow("room mismatch");
   });
 });

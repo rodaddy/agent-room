@@ -3,6 +3,8 @@
   "references": [
     { "path": "packages/room-events" },
     { "path": "packages/provider-adapters" },
+    { "path": "packages/agents-sdk" },
+    { "path": "packages/persistence" },
     { "path": "packages/routing" },
     { "path": "services/orchestrator" },
     { "path": "apps/web" }

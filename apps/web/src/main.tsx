@@ -1,6 +1,16 @@
 import { useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
-import { Mic, Pause, Radio, Send, Square, Volume2 } from "lucide-react";
+import {
+  Download,
+  Mic,
+  Paperclip,
+  Pause,
+  Plus,
+  Radio,
+  Send,
+  Square,
+  Volume2,
+} from "lucide-react";
 import {
   createRoomEvent,
   safeParseRoomEvent,
@@ -24,6 +34,15 @@ interface ParticipantView {
   state: AgentState;
   color: string;
   voice: boolean;
+}
+
+interface ContextItemView {
+  contextId: string;
+  name: string;
+  kind: "snippet" | "file" | "url" | "note";
+  preview: string;
+  bytes?: number;
+  artifactPath?: string;
 }
 
 const baseParticipants: ParticipantView[] = [
@@ -79,6 +98,18 @@ const baseParticipants: ParticipantView[] = [
 
 const initialEvents: RoomEvent[] = [
   createRoomEvent({
+    id: "mock_context_1",
+    roomId: "demo",
+    kind: "context.attached",
+    from: "human:rico",
+    payload: {
+      contextId: "ctx_prd",
+      name: "docs/PRD.md",
+      kind: "file",
+      preview: "Room events are the product core; voice is a transport.",
+    },
+  }),
+  createRoomEvent({
     id: "mock_human_1",
     roomId: "demo",
     kind: "message.created",
@@ -86,6 +117,7 @@ const initialEvents: RoomEvent[] = [
     to: ["agent:bilby", "agent:skippy"],
     payload: {
       text: "@bilby @skippy sketch the MVP pass and keep receipts visible.",
+      contextIds: ["ctx_prd"],
     },
   }),
   createRoomEvent({
@@ -123,6 +155,7 @@ const initialEvents: RoomEvent[] = [
       label: "room.event.v1",
       summary: "Mock receipt rendered from the shared event contract.",
       verification: "filesystem-verified",
+      artifactId: "ctx_prd",
     },
   }),
   createRoomEvent({
@@ -182,34 +215,37 @@ const initialEvents: RoomEvent[] = [
   }),
 ];
 
-const contextItems = [
-  { name: "docs/PRD.md", type: "source", size: "room events core" },
-  {
-    name: "docs/goal-mvp-pass-1.md",
-    type: "run contract",
-    size: "issues #1-#5",
-  },
-  {
-    name: "sample-interface.png",
-    type: "visual ref",
-    size: "dense room layout",
-  },
-];
-
 function App() {
   const [message, setMessage] = useState(
     "@bilby summarize the current workspace receipts",
   );
   const [events, setEvents] = useState<RoomEvent[]>(initialEvents);
+  const [selectedContextIds, setSelectedContextIds] = useState<string[]>([
+    "ctx_prd",
+  ]);
+  const [contextDraft, setContextDraft] = useState(
+    "SQLite should store room events and Vaultwarden secret references only.",
+  );
+  const [selectedContextId, setSelectedContextId] = useState("ctx_prd");
   const routeChips = useMemo(() => extractRouteChips(message), [message]);
+  const contextItems = useMemo(() => deriveContextItems(events), [events]);
+  const contextById = useMemo(
+    () => new Map(contextItems.map((item) => [item.contextId, item])),
+    [contextItems],
+  );
   const participants = useMemo(
     () => deriveParticipantViews(baseParticipants, events),
     [events],
   );
   const voiceState = useMemo(() => deriveVoiceState(events), [events]);
+  const selectedContext = contextById.get(selectedContextId) ?? contextItems[0];
 
   function appendEvent(event: RoomEvent): void {
-    setEvents((current) => [...current, event]);
+    setEvents((current) =>
+      current.some((candidate) => candidate.id === event.id)
+        ? current
+        : [...current, event],
+    );
   }
 
   function sendMessage(): void {
@@ -218,10 +254,46 @@ function App() {
       roomId: "demo",
       kind: "message.created",
       from: "human:rico",
-      payload: { text: message },
+      payload: { text: message, contextIds: selectedContextIds },
     });
     appendEvent(event);
     sendToOrchestrator(event, appendEvent);
+  }
+
+  function attachSnippet(): void {
+    const event = createRoomEvent({
+      id: crypto.randomUUID(),
+      roomId: "demo",
+      kind: "context.attached",
+      from: "human:rico",
+      payload: {
+        contextId: crypto.randomUUID(),
+        name: "Scratch note",
+        kind: "snippet",
+        preview: contextDraft,
+        bytes: contextDraft.length,
+      },
+    });
+    appendEvent(event);
+    setSelectedContextIds((current) => [
+      ...current,
+      String(event.payload.contextId),
+    ]);
+    setSelectedContextId(String(event.payload.contextId));
+    sendContextToOrchestrator(event, appendEvent);
+  }
+
+  function toggleContext(contextId: string): void {
+    setSelectedContextIds((current) =>
+      current.includes(contextId)
+        ? current.filter((candidate) => candidate !== contextId)
+        : [...current, contextId],
+    );
+    setSelectedContextId(contextId);
+  }
+
+  function exportTranscript(): void {
+    void exportTranscriptForRoom(events);
   }
 
   return (
@@ -278,6 +350,13 @@ function App() {
             <button className="danger" title="Stop">
               <Square size={17} />
             </button>
+            <button
+              className="inactive"
+              title="Export transcript"
+              onClick={exportTranscript}
+            >
+              <Download size={17} />
+            </button>
           </div>
         </header>
 
@@ -292,12 +371,36 @@ function App() {
                 <small>{event.from}</small>
               </div>
               <p>{describeRoomEvent(event)}</p>
+              {contextIdsFor(event).map((contextId) => (
+                <button
+                  className="context-chip"
+                  key={contextId}
+                  type="button"
+                  onClick={() => setSelectedContextId(contextId)}
+                >
+                  <Paperclip size={12} />
+                  {contextById.get(contextId)?.name ?? contextId}
+                </button>
+              ))}
               {receiptVerificationFor(event) ? (
                 <span
                   className={`receipt-chip receipt-${receiptVerificationFor(event)}`}
                 >
                   {receiptVerificationLabel(receiptVerificationFor(event))}
                 </span>
+              ) : null}
+              {artifactIdFor(event) ? (
+                <button
+                  className="context-chip"
+                  type="button"
+                  onClick={() =>
+                    setSelectedContextId(artifactIdFor(event) ?? "")
+                  }
+                >
+                  artifact{" "}
+                  {contextById.get(artifactIdFor(event) ?? "")?.name ??
+                    artifactIdFor(event)}
+                </button>
               ) : null}
               {event.to.length > 0 ? (
                 <span className="target-chip">to {event.to.join(", ")}</span>
@@ -317,6 +420,11 @@ function App() {
             {routeChips.map((chip) => (
               <span key={chip}>{chip}</span>
             ))}
+            {selectedContextIds.map((contextId) => (
+              <span key={contextId}>
+                ctx:{contextById.get(contextId)?.name ?? contextId}
+              </span>
+            ))}
           </div>
           <label htmlFor="message">Message</label>
           <div className="composer-row">
@@ -335,21 +443,37 @@ function App() {
       <aside className="workspace">
         <header>
           <h2>Workspace</h2>
-          <p>/app/workspace · mock</p>
+          <p>/app/workspace · persisted context</p>
         </header>
+        <section className="context-editor">
+          <textarea
+            aria-label="New context snippet"
+            value={contextDraft}
+            onChange={(event) => setContextDraft(event.currentTarget.value)}
+          />
+          <button type="button" onClick={attachSnippet}>
+            <Plus size={15} />
+            Attach
+          </button>
+        </section>
         {contextItems.map((item) => (
-          <section className="context-item" key={item.name}>
+          <section
+            className={`context-item ${selectedContextIds.includes(item.contextId) ? "context-selected" : ""}`}
+            key={item.contextId}
+          >
             <strong>{item.name}</strong>
-            <span>{item.type}</span>
-            <small>{item.size}</small>
+            <span>{item.kind}</span>
+            <small>{item.bytes ? `${item.bytes}B` : item.contextId}</small>
+            <button type="button" onClick={() => toggleContext(item.contextId)}>
+              {selectedContextIds.includes(item.contextId)
+                ? "attached"
+                : "attach"}
+            </button>
           </section>
         ))}
         <section className="preview">
           <h3>Selected Preview</h3>
-          <pre>{`receipt.created
-label: room.event.v1
-verification: filesystem-verified
-status: visible in room timeline`}</pre>
+          <pre>{selectedContext?.preview ?? "No context selected."}</pre>
         </section>
       </aside>
     </main>
@@ -388,6 +512,99 @@ function sendToOrchestrator(
   });
 }
 
+function sendContextToOrchestrator(
+  event: RoomEvent,
+  appendEvent: (event: RoomEvent) => void,
+): void {
+  fetch(`${orchestratorHttpUrl()}/rooms/demo/context`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(event.payload),
+  })
+    .then((response) => (response.ok ? response.json() : undefined))
+    .then((result) => {
+      const echoed = (result as { event?: unknown } | undefined)?.event;
+      if (echoed) {
+        const parsed = safeParseRoomEvent(echoed);
+        if (parsed.success) {
+          appendEvent(parsed.data);
+        }
+      }
+    })
+    .catch(() => {
+      appendEvent(
+        createRoomEvent({
+          id: crypto.randomUUID(),
+          roomId: "demo",
+          kind: "routing.warning",
+          from: "system:web",
+          payload: {
+            mode: "warning",
+            targets: [],
+            warnings: [
+              "Context kept locally; orchestrator context API is unavailable.",
+            ],
+            normalizedText: "",
+          },
+        }),
+      );
+    });
+}
+
+async function exportTranscriptForRoom(events: RoomEvent[]): Promise<void> {
+  try {
+    const response = await fetch(
+      `${orchestratorHttpUrl()}/rooms/demo/transcript`,
+    );
+    if (response.ok) {
+      const body = (await response.json()) as { markdown?: string };
+      downloadText(
+        "agent-room-demo-transcript.md",
+        body.markdown ?? renderLocalTranscript(events),
+      );
+      return;
+    }
+  } catch {
+    // Local browser export remains available without the orchestrator.
+  }
+  downloadText("agent-room-demo-transcript.md", renderLocalTranscript(events));
+}
+
+function orchestratorHttpUrl(): string {
+  return (
+    import.meta.env.VITE_ORCHESTRATOR_HTTP_URL ?? "http://127.0.0.1:4000"
+  ).replace(/\/+$/, "");
+}
+
+function downloadText(filename: string, text: string): void {
+  const url = URL.createObjectURL(new Blob([text], { type: "text/markdown" }));
+  const anchor = document.createElement("a");
+  anchor.href = url;
+  anchor.download = filename;
+  anchor.click();
+  URL.revokeObjectURL(url);
+}
+
+function renderLocalTranscript(events: RoomEvent[]): string {
+  return [
+    "# Agent Room Transcript: demo",
+    "",
+    ...events
+      .filter(
+        (event) =>
+          event.kind === "message.created" ||
+          event.kind === "message.transcript_final" ||
+          event.kind === "agent.completed" ||
+          event.kind === "agent.blocked",
+      )
+      .map(
+        (event) =>
+          `- ${event.createdAt} ${event.from}: ${describeRoomEvent(event)}`,
+      ),
+    "",
+  ].join("\n");
+}
+
 function appendParsedSocketEvent(
   payload: string,
   appendEvent: (event: RoomEvent) => void,
@@ -416,6 +633,71 @@ function appendParsedSocketEvent(
       },
     }),
   );
+}
+
+function deriveContextItems(events: RoomEvent[]): ContextItemView[] {
+  const items = new Map<string, ContextItemView>();
+  for (const event of events) {
+    if (
+      event.kind !== "context.attached" &&
+      event.kind !== "workspace.file_observed" &&
+      event.kind !== "workspace.file_changed"
+    ) {
+      continue;
+    }
+    const contextId =
+      typeof event.payload.contextId === "string"
+        ? event.payload.contextId
+        : "";
+    const name =
+      typeof event.payload.name === "string" ? event.payload.name : contextId;
+    const kind = contextKindFor(event.payload.kind);
+    if (!contextId || !name || !kind) {
+      continue;
+    }
+    const item: ContextItemView = {
+      contextId,
+      name,
+      kind,
+      preview:
+        typeof event.payload.preview === "string"
+          ? event.payload.preview
+          : "No preview available.",
+    };
+    if (typeof event.payload.bytes === "number") {
+      item.bytes = event.payload.bytes;
+    }
+    if (typeof event.payload.artifactPath === "string") {
+      item.artifactPath = event.payload.artifactPath;
+    }
+    items.set(contextId, item);
+  }
+  return [...items.values()];
+}
+
+function contextIdsFor(event: RoomEvent): string[] {
+  const contextIds = event.payload.contextIds;
+  return Array.isArray(contextIds)
+    ? contextIds.filter((item): item is string => typeof item === "string")
+    : [];
+}
+
+function artifactIdFor(event: RoomEvent): string | undefined {
+  return typeof event.payload.artifactId === "string"
+    ? event.payload.artifactId
+    : undefined;
+}
+
+function contextKindFor(value: unknown): ContextItemView["kind"] | undefined {
+  if (
+    value === "snippet" ||
+    value === "file" ||
+    value === "url" ||
+    value === "note"
+  ) {
+    return value;
+  }
+  return undefined;
 }
 
 function extractRouteChips(value: string): string[] {

@@ -38,7 +38,7 @@ Homelab mode uses LiveKit/WebRTC, LiteLLM-first reasoning, local STT/TTS, transc
 - `apps/web` for the room UI
 - `services/orchestrator` for routing, room events, agent lifecycle, and provider brokering
 - shared packages for event schemas, provider interfaces, agents, voice, persistence, UI, and workspace receipts
-- Postgres for durable state
+- SQLite for MVP local durable state, with a clean path to Postgres if multi-user/server deployment later needs it
 - Redis or equivalent for presence/fanout when needed
 
 ## Planned Monorepo Shape
@@ -78,7 +78,9 @@ bun run test:e2e
 
 `bun run dev` starts the orchestrator and web UI together. For split terminals, use `bun run dev:orchestrator` and `bun run dev:web`.
 
-Copy `.env.example` when local configuration is needed. The orchestrator allows unauthenticated WebSocket upgrades only on loopback by default; set `ORCHESTRATOR_LOCAL_TOKEN` before exposing it beyond `127.0.0.1`/`localhost`.
+Copy `.env.example` when local configuration is needed. The orchestrator allows unauthenticated WebSocket upgrades only when both the bind host and request URL are loopback by default; set `ORCHESTRATOR_LOCAL_TOKEN` before exposing it beyond `127.0.0.1`/`localhost`. Bearer auth is required for exposed/non-loopback use; `sessionToken` query auth is restricted to loopback development only.
+
+The local MVP persists room state to SQLite at `AGENT_ROOM_DB_PATH` and writes transcript artifacts under `AGENT_ROOM_ARTIFACT_DIR`. Persona metadata is loaded from Hermes backups through `AGENT_ROOM_PERSONA_ROOT`; only prompt previews and source paths are exposed to the app. Secret values belong in Vaultwarden, while SQLite stores only hashes and `vaultwarden://agent-room/...` references.
 
 ## Implementation Strategy
 

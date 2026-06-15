@@ -114,6 +114,19 @@ export interface VoiceRoomProvider {
   }): Promise<ProviderResult<{ ended: true }>>;
 }
 
+export interface HttpLlmProviderOptions {
+  apiKey?: string;
+  baseUrl?: string;
+  model?: string;
+  fetchFn?: FetchFn;
+  timeoutMs?: number;
+}
+
+type FetchFn = (
+  input: Parameters<typeof fetch>[0],
+  init?: Parameters<typeof fetch>[1],
+) => ReturnType<typeof fetch>;
+
 export function blockedProviderResult<T>(
   provider: string,
   message: string,
@@ -129,6 +142,70 @@ export function blockedProviderResult<T>(
   };
 }
 
+export function createOpenAiResponsesLlmProvider(
+  options: HttpLlmProviderOptions = {},
+): LlmProvider {
+  const id = "openai-responses";
+  const apiKey = options.apiKey ?? process.env.OPENAI_API_KEY;
+  const baseUrl = trimTrailingSlash(
+    options.baseUrl ??
+      process.env.OPENAI_BASE_URL ??
+      "https://api.openai.com/v1",
+  );
+  const model = options.model ?? process.env.OPENAI_MODEL ?? "gpt-4.1-mini";
+  const fetchFn = options.fetchFn ?? fetch;
+  const timeoutMs = providerTimeoutMs(options.timeoutMs);
+
+  return {
+    id,
+    async complete(input) {
+      if (!apiKey) {
+        return blockedProviderResult(id, "OPENAI_API_KEY is not configured.");
+      }
+      return postJsonLlmRequest({
+        id,
+        fetchFn,
+        url: `${baseUrl}/responses`,
+        headers: { authorization: `Bearer ${apiKey}` },
+        timeoutMs,
+        body: {
+          model,
+          input: promptWithContext(input),
+        },
+        parseText: parseOpenAiResponsesText,
+      });
+    },
+  };
+}
+
+export function createLiteLlmProvider(
+  options: HttpLlmProviderOptions = {},
+): LlmProvider {
+  return createOpenAiCompatibleChatProvider({
+    id: "litellm",
+    apiKey: options.apiKey ?? process.env.LITELLM_API_KEY,
+    baseUrl: options.baseUrl ?? process.env.LITELLM_BASE_URL,
+    model: options.model ?? process.env.LITELLM_MODEL ?? "local/default",
+    fetchFn: options.fetchFn ?? fetch,
+    timeoutMs: providerTimeoutMs(options.timeoutMs),
+    missingMessage: "LITELLM_BASE_URL is not configured.",
+  });
+}
+
+export function createLocalHttpLlmProvider(
+  options: HttpLlmProviderOptions = {},
+): LlmProvider {
+  return createOpenAiCompatibleChatProvider({
+    id: "local-http-llm",
+    apiKey: options.apiKey,
+    baseUrl: options.baseUrl ?? process.env.LOCAL_MODEL_BASE_URL,
+    model: options.model ?? process.env.LOCAL_MODEL_NAME ?? "local/default",
+    fetchFn: options.fetchFn ?? fetch,
+    timeoutMs: providerTimeoutMs(options.timeoutMs),
+    missingMessage: "LOCAL_MODEL_BASE_URL is not configured.",
+  });
+}
+
 export function createMockLlmProvider(id = "mock-llm"): LlmProvider {
   return {
     id,
@@ -142,6 +219,168 @@ export function createMockLlmProvider(id = "mock-llm"): LlmProvider {
       };
     },
   };
+}
+
+function createOpenAiCompatibleChatProvider(input: {
+  id: string;
+  apiKey: string | undefined;
+  baseUrl: string | undefined;
+  model: string;
+  fetchFn: FetchFn;
+  timeoutMs: number;
+  missingMessage: string;
+}): LlmProvider {
+  return {
+    id: input.id,
+    async complete(turn) {
+      if (!input.baseUrl) {
+        return blockedProviderResult(input.id, input.missingMessage);
+      }
+      const headers: Record<string, string> = {};
+      if (input.apiKey) {
+        headers.authorization = `Bearer ${input.apiKey}`;
+      }
+      return postJsonLlmRequest({
+        id: input.id,
+        fetchFn: input.fetchFn,
+        url: `${trimTrailingSlash(input.baseUrl)}/chat/completions`,
+        headers,
+        timeoutMs: input.timeoutMs,
+        body: {
+          model: input.model,
+          messages: [{ role: "user", content: promptWithContext(turn) }],
+        },
+        parseText: parseChatCompletionText,
+      });
+    },
+  };
+}
+
+async function postJsonLlmRequest(input: {
+  id: string;
+  fetchFn: FetchFn;
+  url: string;
+  headers: Record<string, string>;
+  timeoutMs: number;
+  body: Record<string, unknown>;
+  parseText: (payload: unknown) => string | undefined;
+}): Promise<ProviderResult<{ text: string }>> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), input.timeoutMs);
+  try {
+    const response = await input.fetchFn(input.url, {
+      method: "POST",
+      signal: controller.signal,
+      headers: {
+        "content-type": "application/json",
+        ...input.headers,
+      },
+      body: JSON.stringify(input.body),
+    });
+    clearTimeout(timeout);
+    if (!response.ok) {
+      return {
+        status: "error",
+        provider: input.id,
+        issue: {
+          code: "provider_http_error",
+          message: `${input.id} returned HTTP ${response.status}.`,
+          retryable: response.status >= 500,
+        },
+      };
+    }
+    const text = input.parseText(await response.json());
+    if (!text) {
+      return {
+        status: "error",
+        provider: input.id,
+        issue: {
+          code: "provider_empty_response",
+          message: `${input.id} returned no text.`,
+          retryable: true,
+        },
+      };
+    }
+    return {
+      status: "ok",
+      provider: input.id,
+      value: { text },
+    };
+  } catch (error) {
+    clearTimeout(timeout);
+    const timedOut =
+      error instanceof DOMException && error.name === "AbortError";
+    return {
+      status: "error",
+      provider: input.id,
+      issue: {
+        code: timedOut ? "provider_timeout" : "provider_request_failed",
+        message: timedOut
+          ? `${input.id} timed out after ${input.timeoutMs}ms.`
+          : error instanceof Error
+            ? error.message
+            : "Provider request failed.",
+        retryable: true,
+      },
+    };
+  }
+}
+
+function providerTimeoutMs(configured: number | undefined): number {
+  if (configured && Number.isFinite(configured) && configured > 0) {
+    return configured;
+  }
+  const fromEnv = Number.parseInt(
+    process.env.LLM_PROVIDER_TIMEOUT_MS ?? "30000",
+    10,
+  );
+  return Number.isFinite(fromEnv) && fromEnv > 0 ? fromEnv : 30000;
+}
+
+function promptWithContext(input: LlmTurnInput): string {
+  const context = input.context?.length
+    ? [
+        "Context:",
+        ...input.context.map((item) => `- ${item.id}: ${item.text}`),
+        "",
+      ].join("\n")
+    : "";
+  return `${context}${input.prompt}`;
+}
+
+function parseOpenAiResponsesText(payload: unknown): string | undefined {
+  if (isRecord(payload) && typeof payload.output_text === "string") {
+    return payload.output_text;
+  }
+  const output =
+    isRecord(payload) && Array.isArray(payload.output) ? payload.output : [];
+  for (const item of output) {
+    const content =
+      isRecord(item) && Array.isArray(item.content) ? item.content : [];
+    for (const part of content) {
+      if (isRecord(part) && typeof part.text === "string") {
+        return part.text;
+      }
+    }
+  }
+  return undefined;
+}
+
+function parseChatCompletionText(payload: unknown): string | undefined {
+  const choices =
+    isRecord(payload) && Array.isArray(payload.choices) ? payload.choices : [];
+  const first = choices[0];
+  const message = isRecord(first) ? first.message : undefined;
+  const content = isRecord(message) ? message.content : undefined;
+  return typeof content === "string" ? content : undefined;
+}
+
+function trimTrailingSlash(value: string): string {
+  return value.replace(/\/+$/, "");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
 export function createMockSttProvider(id = "mock-stt"): SttProvider {
