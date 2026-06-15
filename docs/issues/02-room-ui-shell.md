@@ -1,18 +1,36 @@
 ## Goal
-Build the first working room UI shell in `apps/web`.
+
+Build the first working room UI shell in `apps/web` using mock room events.
 
 ## Deliverables
-- room layout with timeline, composer, participant rail, and context panel shell
-- mention-aware composer UI
-- mocked messages for local development
-- agent state badges
-- responsive layout that works on laptop screens
 
-## Acceptance criteria
-- app renders a believable collaborative room UI
-- mock messages show human, agent, and receipt rows distinctly
-- composer visually supports `@agent` and `@all`
-- no backend required for the first render
+- Dense workroom layout inspired by the provided sample: roster left, transcript center, context/workspace right.
+- Timeline rows for human messages, agent messages, moderator notices, voice transcripts, receipts, and errors.
+- Mention-aware composer UI with routing preview for `@agent`, `@all`, and multiple targets.
+- Voice controls shell for connect, push/hold-to-talk, spoken response toggle, and interrupt/hold.
+- Context/workspace panel shell for snippets, files, and selected previews.
+- Agent state badges for idle, reading, thinking, speaking, blocked, and offline.
+- Mock event data that exercises the visible states.
 
-## Notes for Codex
-Use shadcn/ui and Tailwind. Optimize for clarity over novelty.
+## Acceptance Criteria
+
+- App renders the room as the first screen, not a marketing page.
+- Mock messages distinguish human, agent, moderator, transcript, and receipt rows.
+- Composer visually supports direct mentions, `@all`, and route preview.
+- Voice controls are visible but can be mocked.
+- Layout works on laptop screens without overlapping text or controls.
+- No backend is required for the first render.
+
+## Validation
+
+```bash
+bun run dev
+bun run typecheck
+bun run lint
+```
+
+Manual check: open the web app and verify roster, timeline, composer, voice controls, context/workspace panel, and receipts are all visible.
+
+## Notes For Codex
+
+Use stable dimensions for rails, transcript rows, and controls. Prefer a work-focused interface over decorative hero/page chrome.
