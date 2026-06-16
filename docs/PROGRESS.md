@@ -68,3 +68,30 @@ Validation evidence:
 - Post-review smoke rerun: `curl` health/web/context/transcript passed and wrote markdown under `/Volumes/ThunderBolt/_tmp/agent-room-runtime/smoke2-artifacts/`.
 - Focused fix verification job `5339dfda-2597-4592-ace6-adc64ab440a5`: correctness, security, and docs lanes all reported `pass` with zero remaining findings for the prior review items.
 - Browser visual smoke: skipped because Playwright was available but its Chromium binary was not installed; no browser download was performed during this pass.
+
+## 2026-06-15 MVP Pass 3
+
+- Controller branch: `codex/mvp-pass-3`.
+- Scope: issues #9 and #10 only.
+- Added mock-first voice session lifecycle endpoints:
+  - `POST /rooms/:roomId/voice/session`
+  - `POST`/`DELETE /rooms/:roomId/voice/session/:sessionId/end`
+- Extended `VoiceRoomProvider` to return session config with transport, expiry, optional join URL, optional token, and capabilities.
+- Added fail-closed OpenAI Realtime and LiveKit/WebRTC voice-room adapter slots so the architecture remains swappable without pretending live token minting is done.
+- Routed `message.transcript_final` through the same moderator, agent dispatch, context, receipt, and persistence path as text messages.
+- Wired the web voice controls to start/end mock sessions, send a final mock transcript, toggle spoken replies, simulate failure, and export the transcript.
+- Added `scripts/local-smoke.ts` and mapped `bun run test:e2e` to the local smoke flow.
+- Added deployment and demo docs for cloud/API, Mac mini local/hybrid, and homelab LiveKit/LiteLLM modes.
+
+Validation evidence:
+
+- `bun test packages/room-events/src/index.test.ts packages/provider-adapters/src/index.test.ts services/orchestrator/src/room-hub.test.ts services/orchestrator/src/server.test.ts`: 29 tests passed.
+- `bun run format`: passed.
+- `bun run typecheck`: passed.
+- `bun run lint`: passed via typecheck-backed lint placeholder.
+- `bun run test`: 47 source tests passed.
+- `bun run test:e2e`: passed; local smoke validated health, context attach, text routing, mock voice session, voice transcript routing, and transcript export.
+- `bun run build`: passed, including Vite production build.
+- `git diff --check`: passed.
+- `ggshield secret scan repo .`: passed.
+- Browser visual smoke: not run in this pass because the local smoke command is the E2E gate and no browser download/live UI action was required. Browser visual checks remain useful when a browser runtime is available.

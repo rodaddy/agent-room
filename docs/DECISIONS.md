@@ -24,3 +24,11 @@
 - Expose prompt previews/source paths only; do not send full Hermes persona prompts to the browser, logs, issues, or PRs.
 - Restrict durable-token query authentication to loopback development; exposed/non-loopback use must send bearer auth.
 - Guard HTTP provider calls with `LLM_PROVIDER_TIMEOUT_MS` so hung providers turn into visible error/blocked events instead of stuck dispatches.
+
+## 2026-06-15: MVP pass 3 voice and validation boundary
+
+- Use a mock-first voice session endpoint for the MVP so the room can demonstrate voice lifecycle and final transcript routing without paid provider calls, browser downloads, or homelab mutation.
+- Keep OpenAI Realtime and LiveKit/WebRTC as peer `VoiceRoomProvider` slots; both fail closed until a later approved pass implements live token minting and provider calls.
+- Treat `message.transcript_final` as a first-class routable room event, not a separate voice-only path.
+- Use `bun run test:e2e` for the local smoke gate. The smoke starts the orchestrator in-process, uses SQLite/artifacts under `/Volumes/ThunderBolt/_tmp`, exercises text/context/voice/transcript export, and avoids Playwright browser binary dependencies.
+- Keep browser visual checks as a useful manual/frontend gate when a browser runtime is available, but do not make browser downloads a required local MVP validation step.

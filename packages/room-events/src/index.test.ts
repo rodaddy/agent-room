@@ -74,4 +74,26 @@ describe("room event contracts", () => {
 
     expect(receipt.metadata).toEqual({});
   });
+
+  test("accepts voice session metadata for swappable transports", () => {
+    const result = safeParseRoomEvent({
+      id: "evt_voice",
+      schemaVersion: roomEventSchemaVersion,
+      roomId: "room_demo",
+      kind: "voice.session_started",
+      from: "system:voice",
+      to: [],
+      createdAt: new Date().toISOString(),
+      payload: {
+        sessionId: "mock-room_demo-rico",
+        provider: "mock-voice-room",
+        state: "started",
+        transport: "mock",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        capabilities: ["transcript-final", "spoken-response-toggle"],
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
 });

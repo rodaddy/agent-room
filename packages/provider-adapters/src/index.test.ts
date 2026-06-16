@@ -3,11 +3,13 @@ import { z } from "zod";
 import {
   blockedProviderResult,
   createLiteLlmProvider,
+  createLiveKitVoiceRoomProvider,
   createLocalHttpLlmProvider,
   createMockLlmProvider,
   createMockSttProvider,
   createMockTtsProvider,
   createMockVoiceRoomProvider,
+  createOpenAiRealtimeVoiceRoomProvider,
   createOpenAiResponsesLlmProvider,
   normalizeProviderResult,
 } from "./index";
@@ -138,6 +140,28 @@ describe("provider adapters", () => {
       participantId: "rico",
     });
     expect(result.value?.sessionId).toBe("mock-demo-rico");
+    expect(result.value?.transport).toBe("mock");
+    expect(result.value?.capabilities).toContain("transcript-final");
+    expect(result.value?.expiresAt).toMatch(/T/);
+  });
+
+  test("live voice room slots fail closed until explicitly implemented", async () => {
+    const realtime =
+      await createOpenAiRealtimeVoiceRoomProvider().createSession({
+        roomId: "demo",
+        participantId: "rico",
+      });
+    const livekit = await createLiveKitVoiceRoomProvider().createSession({
+      roomId: "demo",
+      participantId: "rico",
+    });
+
+    expect(realtime.status).toBe("blocked");
+    expect(realtime.provider).toBe("openai-realtime");
+    expect(realtime.issue?.message).toContain("LIVE_VOICE_PROVIDERS_ENABLED");
+    expect(livekit.status).toBe("blocked");
+    expect(livekit.provider).toBe("livekit-webrtc");
+    expect(livekit.issue?.message).toContain("LIVEKIT_URL");
   });
 
   test("mock STT and TTS providers expose low-fidelity fixture paths", async () => {

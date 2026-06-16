@@ -27,7 +27,12 @@ const secrets: BootstrapSecret[] = [
     secretRef:
       process.env.AGENT_ROOM_ORCHESTRATOR_TOKEN_REF ??
       "vaultwarden://agent-room/orchestrator-local-token",
-    scopes: ["room:connect", "context:write", "transcript:read"],
+    scopes: [
+      "room:connect",
+      "context:write",
+      "transcript:read",
+      "voice:session",
+    ],
   },
 ];
 

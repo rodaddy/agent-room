@@ -108,10 +108,19 @@ export interface VoiceRoomProvider {
   createSession(input: {
     roomId: string;
     participantId: string;
-  }): Promise<ProviderResult<{ sessionId: string; joinUrl?: string }>>;
+  }): Promise<ProviderResult<VoiceSessionConfig>>;
   endSession(input: {
     sessionId: string;
   }): Promise<ProviderResult<{ ended: true }>>;
+}
+
+export interface VoiceSessionConfig {
+  sessionId: string;
+  transport: "mock" | "openai-realtime" | "livekit-webrtc";
+  expiresAt: string;
+  joinUrl?: string;
+  token?: string;
+  capabilities: string[];
 }
 
 export interface HttpLlmProviderOptions {
@@ -426,6 +435,13 @@ export function createMockVoiceRoomProvider(
         provider: id,
         value: {
           sessionId: `mock-${input.roomId}-${input.participantId}`,
+          transport: "mock",
+          expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
+          capabilities: [
+            "transcript-final",
+            "spoken-response-toggle",
+            "local-recovery",
+          ],
         },
       };
     },
@@ -435,6 +451,37 @@ export function createMockVoiceRoomProvider(
         provider: id,
         value: { ended: true },
       };
+    },
+  };
+}
+
+export function createOpenAiRealtimeVoiceRoomProvider(): VoiceRoomProvider {
+  const id = "openai-realtime";
+  return createBlockedVoiceRoomProvider(
+    id,
+    "OpenAI Realtime voice is configured as an adapter slot but live sessions require OPENAI_API_KEY and LIVE_VOICE_PROVIDERS_ENABLED=1.",
+  );
+}
+
+export function createLiveKitVoiceRoomProvider(): VoiceRoomProvider {
+  const id = "livekit-webrtc";
+  return createBlockedVoiceRoomProvider(
+    id,
+    "LiveKit/WebRTC voice is configured as an adapter slot but live token minting requires LIVEKIT_URL, LIVEKIT_API_KEY, LIVEKIT_API_SECRET, and LIVE_VOICE_PROVIDERS_ENABLED=1.",
+  );
+}
+
+function createBlockedVoiceRoomProvider(
+  id: "openai-realtime" | "livekit-webrtc",
+  message: string,
+): VoiceRoomProvider {
+  return {
+    id,
+    async createSession() {
+      return blockedProviderResult(id, message);
+    },
+    async endSession() {
+      return { status: "mocked", provider: id, value: { ended: true } };
     },
   };
 }

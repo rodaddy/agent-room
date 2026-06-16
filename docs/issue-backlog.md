@@ -43,10 +43,10 @@ Definition of done: MVP can run an end-to-end text workroom flow with real or mo
 
 Issues 9-10:
 
-- implement first voice transport adapter path
-- add E2E tests and deploy docs
+- implement first voice transport adapter path with mock local sessions and fail-closed OpenAI Realtime/LiveKit slots
+- add one-command local smoke validation, deployment docs, and demo script
 
-Definition of done: MVP can demonstrate voice transcript events through at least one configured voice adapter and has E2E validation plus deployment-mode docs.
+Definition of done: MVP can demonstrate voice transcript events through the same room routing path as text, start/end a local mock voice session, keep OpenAI Realtime and LiveKit behind swappable adapter slots, and run one local command that validates the demo path without live provider spend or homelab mutation.
 
 ## GitHub Project Field Plan
 
