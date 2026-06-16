@@ -130,6 +130,16 @@ Owns:
 
 OpenAI Realtime and LiveKit are peer adapter options.
 
+Current MVP path:
+
+1. Browser requests `POST /rooms/:roomId/voice/session`.
+2. Orchestrator uses `VoiceRoomProvider` to create a short-lived session config.
+3. The default `mock-voice-room` provider emits `voice.session_started` with transport `mock`.
+4. Final browser transcript events use `message.transcript_final`.
+5. Orchestrator routes final transcripts through the same moderator, agent dispatch, context, receipt, and persistence path as text messages.
+6. Browser ends the session with `POST` or `DELETE /rooms/:roomId/voice/session/:sessionId/end`.
+7. Orchestrator emits `voice.session_ended`.
+
 OpenAI Realtime path:
 
 1. Browser requests a voice session from orchestrator.
@@ -198,5 +208,8 @@ For the MVP, SQLite is the local source of replayable state. Secret material is 
 - WebSocket two-client smoke
 - mocked provider room demo
 - provider failure-to-blocked-event tests
-- Playwright room flow
+- local smoke flow through `bun run test:e2e`
+- browser visual/manual checks when a browser runtime is available
 - handoff payload fixture test
+
+Live voice, provider spend, browser downloads, and homelab service mutation are approval-gated validation steps.

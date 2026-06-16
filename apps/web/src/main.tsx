@@ -170,17 +170,6 @@ const initialEvents: RoomEvent[] = [
     },
   }),
   createRoomEvent({
-    id: "mock_voice_1",
-    roomId: "demo",
-    kind: "voice.session_started",
-    from: "system:voice",
-    payload: {
-      sessionId: "mock-voice-session",
-      provider: "mock",
-      state: "started",
-    },
-  }),
-  createRoomEvent({
     id: "mock_participant_1",
     roomId: "demo",
     kind: "participant.state_changed",
@@ -188,17 +177,6 @@ const initialEvents: RoomEvent[] = [
     payload: {
       participantId: "agent:skippy",
       state: "speaking",
-    },
-  }),
-  createRoomEvent({
-    id: "mock_voice_2",
-    roomId: "demo",
-    kind: "message.transcript_final",
-    from: "human:rico",
-    payload: {
-      text: "both pause for a second",
-      source: "voice",
-      confidence: 0.86,
     },
   }),
   createRoomEvent({
@@ -227,6 +205,7 @@ function App() {
     "SQLite should store room events and Vaultwarden secret references only.",
   );
   const [selectedContextId, setSelectedContextId] = useState("ctx_prd");
+  const [spokenReplies, setSpokenReplies] = useState(true);
   const routeChips = useMemo(() => extractRouteChips(message), [message]);
   const contextItems = useMemo(() => deriveContextItems(events), [events]);
   const contextById = useMemo(
@@ -296,6 +275,48 @@ function App() {
     void exportTranscriptForRoom(events);
   }
 
+  function startVoice(): void {
+    startVoiceSession(appendEvent);
+  }
+
+  function endVoice(): void {
+    endVoiceSession(voiceState.sessionId, appendEvent);
+  }
+
+  function sendMockVoiceTranscript(): void {
+    const event = createRoomEvent({
+      id: crypto.randomUUID(),
+      roomId: "demo",
+      kind: "message.transcript_final",
+      from: "human:rico",
+      payload: {
+        text: "@bilby summarize this spoken checkpoint",
+        source: "voice",
+        confidence: 0.91,
+        contextIds: selectedContextIds,
+      },
+    });
+    appendEvent(event);
+    sendToOrchestrator(event, appendEvent);
+  }
+
+  function simulateVoiceFailure(): void {
+    appendEvent(
+      createRoomEvent({
+        id: crypto.randomUUID(),
+        roomId: "demo",
+        kind: "voice.session_ended",
+        from: "system:voice",
+        payload: {
+          sessionId: voiceState.sessionId ?? "mock-voice-session",
+          provider: voiceState.provider,
+          state: "blocked",
+          reason: "Mock microphone failure; retry is available.",
+        },
+      }),
+    );
+  }
+
   return (
     <main className="app-shell">
       <aside className="roster">
@@ -335,20 +356,53 @@ function App() {
             {voiceState.label}
           </span>
           <div className="voice-bar" aria-label="voice controls">
-            <button className="inactive" title="Connect voice">
+            <button
+              aria-label={
+                voiceState.state === "started" ? "Retry voice" : "Connect voice"
+              }
+              className={voiceState.state === "started" ? "active" : "inactive"}
+              onClick={startVoice}
+              type="button"
+            >
               <Radio size={17} />
+              <span>{voiceState.state === "started" ? "Live" : "Connect"}</span>
             </button>
-            <button className="inactive" title="Push to talk">
+            <button
+              aria-label="Send mock voice transcript"
+              className="inactive"
+              onClick={sendMockVoiceTranscript}
+              type="button"
+            >
               <Mic size={17} />
+              <span>Transcript</span>
             </button>
-            <button className="active" title="Spoken replies">
+            <button
+              aria-label="Toggle spoken replies"
+              aria-pressed={spokenReplies}
+              className={spokenReplies ? "active" : "inactive"}
+              onClick={() => setSpokenReplies((current) => !current)}
+              type="button"
+            >
               <Volume2 size={17} />
+              <span>{spokenReplies ? "Spoken on" : "Spoken off"}</span>
             </button>
-            <button className="inactive" title="Hold">
+            <button
+              aria-label="Simulate voice failure"
+              className="inactive"
+              onClick={simulateVoiceFailure}
+              type="button"
+            >
               <Pause size={17} />
+              <span>Fail</span>
             </button>
-            <button className="danger" title="Stop">
+            <button
+              aria-label="Stop voice"
+              className="danger"
+              onClick={endVoice}
+              type="button"
+            >
               <Square size={17} />
+              <span>Stop</span>
             </button>
             <button
               className="inactive"
@@ -549,6 +603,79 @@ function sendContextToOrchestrator(
         }),
       );
     });
+}
+
+function startVoiceSession(appendEvent: (event: RoomEvent) => void): void {
+  fetch(`${orchestratorHttpUrl()}/rooms/demo/voice/session`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ participantId: "human:rico" }),
+  })
+    .then((response) => response.json())
+    .then((result) => appendResultEvent(result, appendEvent))
+    .catch(() => {
+      appendEvent(
+        createRoomEvent({
+          id: crypto.randomUUID(),
+          roomId: "demo",
+          kind: "voice.session_started",
+          from: "system:voice",
+          payload: {
+            sessionId: `local-${crypto.randomUUID()}`,
+            provider: "mock-browser",
+            state: "started",
+            transport: "mock",
+            capabilities: ["transcript-final", "local-recovery"],
+          },
+        }),
+      );
+    });
+}
+
+function endVoiceSession(
+  sessionId: string | undefined,
+  appendEvent: (event: RoomEvent) => void,
+): void {
+  const resolvedSessionId = sessionId ?? "local-mock-session";
+  fetch(
+    `${orchestratorHttpUrl()}/rooms/demo/voice/session/${encodeURIComponent(resolvedSessionId)}/end`,
+    { method: "POST" },
+  )
+    .then((response) => response.json())
+    .then((result) => appendResultEvent(result, appendEvent))
+    .catch(() => {
+      appendEvent(
+        createRoomEvent({
+          id: crypto.randomUUID(),
+          roomId: "demo",
+          kind: "voice.session_ended",
+          from: "system:voice",
+          payload: {
+            sessionId: resolvedSessionId,
+            provider: "mock-browser",
+            state: "ended",
+            transport: "mock",
+          },
+        }),
+      );
+    });
+}
+
+function appendResultEvent(
+  result: unknown,
+  appendEvent: (event: RoomEvent) => void,
+): void {
+  const candidate =
+    result && typeof result === "object"
+      ? (result as { event?: unknown }).event
+      : undefined;
+  if (!candidate) {
+    return;
+  }
+  const parsed = safeParseRoomEvent(candidate);
+  if (parsed.success) {
+    appendEvent(parsed.data);
+  }
 }
 
 async function exportTranscriptForRoom(events: RoomEvent[]): Promise<void> {
@@ -823,6 +950,8 @@ function deriveParticipantViews(
 function deriveVoiceState(events: RoomEvent[]): {
   state: "started" | "ended" | "blocked";
   label: string;
+  sessionId?: string;
+  provider: string;
 } {
   const latestVoiceEvent = [...events]
     .reverse()
@@ -832,7 +961,11 @@ function deriveVoiceState(events: RoomEvent[]): {
         event.kind === "voice.session_ended",
     );
   if (!latestVoiceEvent) {
-    return { state: "ended", label: "voice disconnected · transcript mock" };
+    return {
+      state: "ended",
+      label: "voice disconnected · transcript mock",
+      provider: "mock",
+    };
   }
 
   const state =
@@ -844,13 +977,34 @@ function deriveVoiceState(events: RoomEvent[]): {
     typeof latestVoiceEvent.payload.provider === "string"
       ? latestVoiceEvent.payload.provider
       : "mock";
+  const sessionId =
+    typeof latestVoiceEvent.payload.sessionId === "string"
+      ? latestVoiceEvent.payload.sessionId
+      : undefined;
+  const withSessionId = (value: {
+    state: "started" | "ended" | "blocked";
+    label: string;
+    provider: string;
+  }) => (sessionId ? { ...value, sessionId } : value);
   if (state === "started") {
-    return { state, label: `voice connected · ${provider}` };
+    return withSessionId({
+      state,
+      label: `voice connected · ${provider}`,
+      provider,
+    });
   }
   if (state === "blocked") {
-    return { state, label: `voice blocked · ${provider}` };
+    return withSessionId({
+      state,
+      label: `voice blocked · ${provider}`,
+      provider,
+    });
   }
-  return { state, label: `voice disconnected · ${provider}` };
+  return withSessionId({
+    state,
+    label: `voice disconnected · ${provider}`,
+    provider,
+  });
 }
 
 function participantViewFromPayload(

@@ -15,7 +15,8 @@
     "typecheck": "tsc -b",
     "lint": "bun run typecheck",
     "test": "find packages services -path '*/src/*.test.ts' -print | xargs bun test",
-    "test:e2e": "bun run test",
+    "local:smoke": "bun run scripts/local-smoke.ts",
+    "test:e2e": "bun run local:smoke",
     "format": "prettier --check ."
   },
   "dependencies": {

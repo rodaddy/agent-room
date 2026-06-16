@@ -26,6 +26,7 @@ Add first-class voice support through swappable voice transport, STT, and TTS ad
 
 ```bash
 bun run test
+bun run test:e2e
 bun run typecheck
 ```
 
@@ -34,3 +35,10 @@ Manual/live voice validation requires explicit approval for provider usage or ho
 ## Notes For Codex
 
 Do not treat voice as a separate app. It should feel native to the same room event stream.
+
+## Implementation Notes
+
+- The MVP uses `POST /rooms/:roomId/voice/session` and `POST`/`DELETE /rooms/:roomId/voice/session/:sessionId/end` for voice session lifecycle.
+- `mock-voice-room` is the default local transport and emits `voice.session_started`/`voice.session_ended` room events.
+- OpenAI Realtime and LiveKit/WebRTC are represented as provider slots that fail closed until a later approved live integration adds token minting and provider calls.
+- `message.transcript_final` events are routed through the same moderator, agent dispatch, context, receipt, persistence, and transcript export path as text messages.

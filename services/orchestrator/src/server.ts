@@ -7,7 +7,11 @@ import {
   createLiteLlmProvider,
   createLocalHttpLlmProvider,
   createMockLlmProvider,
+  createMockVoiceRoomProvider,
   createOpenAiResponsesLlmProvider,
+  createOpenAiRealtimeVoiceRoomProvider,
+  createLiveKitVoiceRoomProvider,
+  type VoiceRoomProvider,
 } from "@agent-room/provider-adapters";
 import {
   createContextAttachedEvent,
@@ -29,6 +33,7 @@ import {
 export interface OrchestratorOptions {
   host?: string;
   port?: number;
+  voiceProvider?: VoiceRoomProvider;
   store?: RoomEventStore & {
     close?(): void;
     exportTranscript?(roomId: string): {
@@ -73,6 +78,8 @@ export function createOrchestratorServer(
     storeOptions.artifactDir = process.env.AGENT_ROOM_ARTIFACT_DIR;
   const store = options.store ?? new SqliteStore(storeOptions);
   seedProviderReferences(store);
+  const voiceProvider =
+    options.voiceProvider ?? createConfiguredVoiceRoomProvider();
   const hub = new RoomHub({
     routingConfig: createDemoRoutingConfig(personas),
     personas,
@@ -101,6 +108,28 @@ export function createOrchestratorServer(
               headers: { "content-type": "text/plain; version=0.0.4" },
             },
           );
+        }
+        if (url.pathname.match(/^\/rooms\/[^/]+\/voice\/session$/)) {
+          const auth = authorizeLocalRequest(request, url, { bindHost: host });
+          if (!auth.ok) {
+            return Response.json(
+              { ok: false, error: auth.reason },
+              { status: 401 },
+            );
+          }
+          return startVoiceSession(request, url, hub, voiceProvider);
+        }
+        if (
+          url.pathname.match(/^\/rooms\/[^/]+\/voice\/session\/[^/]+\/end$/)
+        ) {
+          const auth = authorizeLocalRequest(request, url, { bindHost: host });
+          if (!auth.ok) {
+            return Response.json(
+              { ok: false, error: auth.reason },
+              { status: 401 },
+            );
+          }
+          return endVoiceSession(request, url, hub, voiceProvider);
         }
         if (url.pathname.match(/^\/rooms\/[^/]+\/context$/)) {
           const auth = authorizeLocalRequest(request, url, { bindHost: host });
@@ -273,6 +302,123 @@ async function attachContext(
   return Response.json({ ok: true, event });
 }
 
+async function startVoiceSession(
+  request: Request,
+  url: URL,
+  hub: RoomHub,
+  voiceProvider: VoiceRoomProvider,
+): Promise<Response> {
+  if (request.method !== "POST") {
+    return Response.json(
+      { ok: false, error: "method not allowed" },
+      { status: 405 },
+    );
+  }
+  const roomId = roomIdFromPath(url);
+  const body = (await request.json().catch(() => ({}))) as {
+    participantId?: string;
+  };
+  const result = await voiceProvider.createSession({
+    roomId,
+    participantId: body.participantId ?? "human:rico",
+  });
+  if (
+    result.status === "blocked" ||
+    result.status === "error" ||
+    !result.value
+  ) {
+    const event = createRoomEvent({
+      id: crypto.randomUUID(),
+      roomId,
+      kind: "voice.session_ended",
+      from: "system:voice",
+      payload: {
+        sessionId: `blocked-${crypto.randomUUID()}`,
+        provider: result.provider,
+        state: "blocked",
+        reason: result.issue?.message ?? "Voice provider unavailable.",
+      },
+    });
+    hub.publishSystem(roomId, event);
+    return Response.json(
+      { ok: false, event, issue: result.issue },
+      { status: 503 },
+    );
+  }
+  const event = createRoomEvent({
+    id: crypto.randomUUID(),
+    roomId,
+    kind: "voice.session_started",
+    from: "system:voice",
+    payload: {
+      sessionId: result.value.sessionId,
+      provider: result.provider,
+      state: "started",
+      transport: result.value.transport,
+      expiresAt: result.value.expiresAt,
+      capabilities: result.value.capabilities,
+    },
+  });
+  hub.publishSystem(roomId, event);
+  return Response.json({
+    ok: true,
+    event,
+    session: safeVoiceSessionConfig(result.value),
+  });
+}
+
+async function endVoiceSession(
+  request: Request,
+  url: URL,
+  hub: RoomHub,
+  voiceProvider: VoiceRoomProvider,
+): Promise<Response> {
+  if (request.method !== "POST" && request.method !== "DELETE") {
+    return Response.json(
+      { ok: false, error: "method not allowed" },
+      { status: 405 },
+    );
+  }
+  const roomId = roomIdFromPath(url);
+  const sessionId = url.pathname.split("/")[5] ?? "unknown";
+  const result = await voiceProvider.endSession({ sessionId });
+  const event = createRoomEvent({
+    id: crypto.randomUUID(),
+    roomId,
+    kind: "voice.session_ended",
+    from: "system:voice",
+    payload: {
+      sessionId,
+      provider: result.provider,
+      state: result.status === "error" ? "blocked" : "ended",
+      reason: result.issue?.message,
+    },
+  });
+  hub.publishSystem(roomId, event);
+  return Response.json({ ok: result.status !== "error", event });
+}
+
+function safeVoiceSessionConfig<T extends { token?: string; joinUrl?: string }>(
+  value: T,
+): Omit<T, "token"> {
+  const { token: _token, ...safe } = value;
+  if (safe.joinUrl && hasCredentialBearingUrl(safe.joinUrl)) {
+    delete safe.joinUrl;
+  }
+  return safe;
+}
+
+function hasCredentialBearingUrl(value: string): boolean {
+  try {
+    const url = new URL(value);
+    return ["token", "access_token", "jwt", "key", "secret"].some((name) =>
+      url.searchParams.has(name),
+    );
+  } catch {
+    return true;
+  }
+}
+
 function roomIdFromPath(url: URL): string {
   return url.pathname.split("/")[2] ?? "demo";
 }
@@ -343,6 +489,22 @@ function createConfiguredLlmProvider() {
     return createLocalHttpLlmProvider();
   }
   return createMockLlmProvider("mock-llm");
+}
+
+function createConfiguredVoiceRoomProvider(): VoiceRoomProvider {
+  const provider = process.env.VOICE_ROOM_PROVIDER ?? "mock";
+  const liveEnabled = process.env.LIVE_VOICE_PROVIDERS_ENABLED === "1";
+  if (provider === "openai-realtime") {
+    return liveEnabled
+      ? createOpenAiRealtimeVoiceRoomProvider()
+      : createOpenAiRealtimeVoiceRoomProvider();
+  }
+  if (provider === "livekit-webrtc" || provider === "livekit") {
+    return liveEnabled
+      ? createLiveKitVoiceRoomProvider()
+      : createLiveKitVoiceRoomProvider();
+  }
+  return createMockVoiceRoomProvider("mock-voice-room");
 }
 
 function renderTranscript(

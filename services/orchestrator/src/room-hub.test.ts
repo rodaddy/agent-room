@@ -47,6 +47,55 @@ describe("RoomHub", () => {
     ).toBe(true);
   });
 
+  test("routes final voice transcripts through the same dispatch path", async () => {
+    const sent: string[] = [];
+    const hub = new RoomHub();
+    const session = {
+      participant: {
+        id: "human:rico",
+        kind: "human",
+        displayName: "Rico",
+        routeNames: ["rico"],
+        state: "idle",
+        voiceEnabled: true,
+      },
+      socket: {
+        readyState: 1,
+        send: (payload: string) => sent.push(payload),
+      },
+    } satisfies ClientSession;
+
+    hub.connect("demo", session);
+    await hub.ingest(
+      "demo",
+      createRoomEvent({
+        id: "evt_voice_1",
+        roomId: "demo",
+        kind: "message.transcript_final",
+        from: "human:rico",
+        payload: {
+          text: "@bilby summarize this spoken checkpoint",
+          source: "voice",
+          confidence: 0.91,
+        },
+      }),
+    );
+
+    const events = sent.map(
+      (payload) => JSON.parse(payload) as { kind: string; to: string[] },
+    );
+    expect(events.some((event) => event.kind === "routing.resolved")).toBe(
+      true,
+    );
+    expect(
+      events.some(
+        (event) =>
+          event.kind === "agent.dispatch" && event.to.includes("agent:bilby"),
+      ),
+    ).toBe(true);
+    expect(events.some((event) => event.kind === "receipt.created")).toBe(true);
+  });
+
   test("invalid events fail at the boundary", async () => {
     const hub = new RoomHub();
     await expect(

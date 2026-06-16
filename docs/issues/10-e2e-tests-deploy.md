@@ -4,7 +4,7 @@ Finish the MVP plan with end-to-end coverage, deployment-mode docs, and a demo s
 
 ## Deliverables
 
-- Playwright smoke flow for room join, message send, route dispatch, agent reply, receipt rendering, and transcript/handoff path.
+- Local smoke flow for room join, message send, route dispatch, agent reply, receipt rendering, mock voice session, final voice transcript routing, and transcript/handoff path.
 - Basic service health checks.
 - Deployment docs for cloud/API, Mac mini M4 local/hybrid, and homelab LiveKit/LiteLLM modes.
 - Production env var checklist with names only.
@@ -31,3 +31,9 @@ bun run lint
 ## Notes For Codex
 
 Keep deployment assumptions explicit. No hidden platform magic and no live infra mutation without approval.
+
+## Implementation Notes
+
+- `bun run test:e2e` runs `scripts/local-smoke.ts`.
+- The smoke script writes SQLite and transcript artifacts under `/Volumes/ThunderBolt/_tmp` by default, or `AGENT_ROOM_SMOKE_ROOT` when explicitly set.
+- Browser visual checks remain useful but are not the only E2E gate because Playwright browser binaries may not be installed in local Codex sessions.

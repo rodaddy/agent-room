@@ -3,6 +3,7 @@ import { existsSync, mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SqliteStore } from "@agent-room/persistence";
+import { type VoiceRoomProvider } from "@agent-room/provider-adapters";
 import { createRoomEvent, type RoomEvent } from "@agent-room/room-events";
 import {
   authorizeLocalRequest,
@@ -135,6 +136,81 @@ describe("orchestrator websocket rooms", () => {
     });
     client.socket.close();
   });
+
+  test("voice session API publishes start and end room events", async () => {
+    if (!orchestrator) {
+      throw new Error("test server not started");
+    }
+    const client = await connect("demo", "rico");
+    await waitForEvent(client, "participant.joined");
+
+    const startResponse = await fetch(
+      `http://127.0.0.1:${orchestrator.server.port}/rooms/demo/voice/session`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ participantId: "rico" }),
+      },
+    );
+    expect(startResponse.status).toBe(200);
+    const startBody = (await startResponse.json()) as {
+      session: { sessionId: string; token?: string };
+    };
+    expect(startBody.session.sessionId).toBe("mock-demo-rico");
+    expect(startBody.session.token).toBeUndefined();
+    expect(await waitForEvent(client, "voice.session_started")).toMatchObject({
+      payload: { transport: "mock", state: "started" },
+    });
+
+    const endResponse = await fetch(
+      `http://127.0.0.1:${orchestrator.server.port}/rooms/demo/voice/session/${encodeURIComponent(startBody.session.sessionId)}/end`,
+      { method: "POST" },
+    );
+    expect(endResponse.status).toBe(200);
+    expect(await waitForEvent(client, "voice.session_ended")).toMatchObject({
+      payload: { sessionId: startBody.session.sessionId, state: "ended" },
+    });
+    client.socket.close();
+  });
+
+  test("voice session responses and events do not expose provider secrets", async () => {
+    await orchestrator?.stop();
+    const tempRoot = existsSync("/Volumes/ThunderBolt/_tmp")
+      ? "/Volumes/ThunderBolt/_tmp"
+      : tmpdir();
+    const dir = mkdtempSync(join(tempRoot, "agent-room-orchestrator-secret-"));
+    store = new SqliteStore({
+      databasePath: join(dir, "agent-room.sqlite"),
+      artifactDir: join(dir, "artifacts"),
+    });
+    orchestrator = createOrchestratorServer({
+      host: "127.0.0.1",
+      port: 0,
+      store,
+      personaRoot: join(dir, "missing-personas"),
+      voiceProvider: secretBearingVoiceProvider,
+    });
+    const client = await connect("demo", "rico");
+    await waitForEvent(client, "participant.joined");
+
+    const response = await fetch(
+      `http://127.0.0.1:${orchestrator.server.port}/rooms/demo/voice/session`,
+      {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ participantId: "rico" }),
+      },
+    );
+    expect(response.status).toBe(200);
+    const body = await response.json();
+    const event = await waitForEvent(client, "voice.session_started");
+
+    expect(JSON.stringify(body)).not.toContain("secret-token");
+    expect(JSON.stringify(event)).not.toContain("secret-token");
+    expect(body.session.joinUrl).toBeUndefined();
+    expect(event.payload.joinUrl).toBeUndefined();
+    client.socket.close();
+  });
 });
 
 describe("local auth boundary", () => {
@@ -259,6 +335,31 @@ interface TestClient {
   socket: WebSocket;
   events: RoomEvent[];
 }
+
+const secretBearingVoiceProvider: VoiceRoomProvider = {
+  id: "test-live-voice",
+  async createSession() {
+    return {
+      status: "ok",
+      provider: "test-live-voice",
+      value: {
+        sessionId: "secret-session",
+        transport: "livekit-webrtc",
+        expiresAt: new Date(Date.now() + 60_000).toISOString(),
+        joinUrl: "wss://voice.example.test/room?token=secret-token",
+        token: "secret-token",
+        capabilities: ["transcript-final"],
+      },
+    };
+  },
+  async endSession() {
+    return {
+      status: "ok",
+      provider: "test-live-voice",
+      value: { ended: true },
+    };
+  },
+};
 
 async function waitForEvent(
   client: TestClient,

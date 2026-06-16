@@ -115,10 +115,7 @@ export class RoomHub {
     }
     this.publish(roomId, event);
 
-    if (
-      event.kind !== "message.created" ||
-      typeof event.payload.text !== "string"
-    ) {
+    if (!isRoutableMessage(event)) {
       return [event];
     }
 
@@ -254,6 +251,18 @@ export class RoomHub {
         text: item.preview ?? item.name,
       }));
   }
+}
+
+type RoutableMessageEvent = RoomEvent & {
+  payload: RoomEvent["payload"] & { text: string };
+};
+
+function isRoutableMessage(event: RoomEvent): event is RoutableMessageEvent {
+  return (
+    (event.kind === "message.created" ||
+      event.kind === "message.transcript_final") &&
+    typeof event.payload.text === "string"
+  );
 }
 
 export function createDemoRoutingConfig(

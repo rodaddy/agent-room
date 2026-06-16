@@ -120,6 +120,10 @@ export const voiceSessionPayloadSchema = z.object({
   sessionId: z.string().min(1),
   provider: z.string().min(1),
   state: z.enum(["started", "ended", "blocked"]),
+  transport: z.enum(["mock", "openai-realtime", "livekit-webrtc"]).optional(),
+  expiresAt: z.string().datetime().optional(),
+  joinUrl: z.string().optional(),
+  capabilities: z.array(z.string()).default([]),
   reason: z.string().optional(),
 });
 
