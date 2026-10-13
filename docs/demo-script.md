@@ -8,7 +8,7 @@ This script demonstrates the current local MVP without live provider spend or ho
 bun run test:e2e
 ```
 
-Expected result: JSON with `ok: true`, a runtime directory under `/Volumes/ThunderBolt/_tmp`, and checks for health, context, text routing, voice session, voice transcript routing, and transcript export.
+Expected result: JSON with `ok: true`, a runtime directory under the system temp directory, and checks for health, context, text routing, voice session, voice transcript routing, and transcript export.
 
 ## Interactive Demo
 

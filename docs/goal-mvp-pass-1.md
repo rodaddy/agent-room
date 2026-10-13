@@ -6,7 +6,7 @@ Build Agent Room / Voice Workroom MVP pass 1 from the canonical PRD and Project 
 
 ## Source Of Truth
 
-- Repo: `/Volumes/ThunderBolt/Development/agent-room`
+- Repo: `agent-room` (local checkout)
 - Canonical GitHub repo: `rodaddy/agent-room`
 - Project board: `https://github.com/users/rodaddy/projects/7`
 - Planning PR: `https://github.com/rodaddy/agent-room/pull/11`

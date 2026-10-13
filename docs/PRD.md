@@ -25,7 +25,7 @@ The core product is the room event stream. Text, voice, agents, tools, receipts,
 
 - No enterprise multi-org admin, billing, or role hierarchy in MVP.
 - No assumption that OpenAI Realtime is the only voice architecture.
-- No requirement that local-only inference, TN01 NPU acceleration, or local LLM fast lane be complete before MVP demo.
+- No requirement that local-only inference, NPU acceleration on a homelab box, or local LLM fast lane be complete before MVP demo.
 - No arbitrary tool execution without explicit receipt contracts and server-side controls.
 - No hidden live infra mutation, credential lookup, or paid-provider usage without approval.
 - No Codex conversation backend for normal room agent responses unless Rico explicitly chooses it later.
@@ -155,7 +155,7 @@ Run the web app and orchestrator locally. Prefer local Whisper or native/browser
 
 ### Homelab LiveKit/LiteLLM Mode
 
-Use self-hosted LiveKit/WebRTC for audio, LiteLLM for primary reasoning, local Whisper for STT, Edge/Kokoro for TTS, and local transcript/handoff services. TN01 and the referenced LiteLLM proxy are idea-source targets, not hard-coded defaults in repo docs. Live host, IP, and credential work requires separate approval and verification.
+Use self-hosted LiveKit/WebRTC for audio, LiteLLM for primary reasoning, local Whisper for STT, Edge/Kokoro for TTS, and local transcript/handoff services. Any specific homelab host and LiteLLM proxy are idea-source targets, not hard-coded defaults in repo docs. Live host, IP, and credential work requires separate approval and verification.
 
 ## 10. Transcript, Handoff, And Persistence
 

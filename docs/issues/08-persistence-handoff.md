@@ -38,7 +38,7 @@ Prefer the least magical auth path that works cleanly with the selected app stru
 
 - SQLite is the MVP local store for room replay and projections.
 - `room_events` is the canonical event log; messages, dispatches, receipts, context, voice sessions, handoffs, provider configs, identities, room membership, and API keys are projections/supporting tables.
-- API keys are stored as SHA-256 hashes plus Vaultwarden refs only.
+- API keys are stored as SHA-256 hashes plus secret-manager refs only.
 - Duplicate event ids do not re-project different payloads over the canonical event log.
 - Local transcript export emits `handoff.created` and writes markdown artifacts.
 - Live Hermes/Discord posting remains behind future adapter work.

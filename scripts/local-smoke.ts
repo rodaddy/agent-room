@@ -1,11 +1,12 @@
 import { existsSync, mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { SqliteStore } from "../packages/persistence/src";
 import { createRoomEvent, type RoomEvent } from "../packages/room-events/src";
 import { createOrchestratorServer } from "../services/orchestrator/src/server";
 
 const tempRoot =
-  process.env.AGENT_ROOM_SMOKE_ROOT ?? "/Volumes/ThunderBolt/_tmp";
+  process.env.AGENT_ROOM_SMOKE_ROOT ?? tmpdir();
 
 if (!existsSync(tempRoot)) {
   throw new Error(

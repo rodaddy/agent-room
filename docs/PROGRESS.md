@@ -41,9 +41,9 @@ Browser visual check note: the in-app Browser plugin reported `iab` unavailable 
 - Added config-driven agent loading from Hermes backup metadata for Bilby, Skippy, and Nagatha, with generic fallback agents merged into local demo routing.
 - Added provider-backed agent runtime that defaults to mock locally, selects OpenAI Responses/LiteLLM/local HTTP LLM providers from env when configured, and emits dispatch lifecycle events, blocked states, and provider receipts with context counts.
 - Added context snippet attach, selected context chips, receipt artifact chips, persisted context API, and local transcript export/handoff hooks to the web/orchestrator flow.
-- Added local secret boundary: secret values stay in Vaultwarden; SQLite stores hashes and `vaultwarden://agent-room/...` references.
-- Created Vaultwarden secure notes for `Agent Room - Admin API Key` and `Agent Room - Orchestrator Local Token`; seeded a temporary SQLite DB under `/Volumes/ThunderBolt/_tmp/agent-room-runtime` with only refs and token hashes.
-- Runtime smoke validation used `/Volumes/ThunderBolt/_tmp/agent-room-runtime` for SQLite and transcript artifacts; repo-local `data/` is ignored for user-run local persistence and was not used for Codex validation.
+- Added local secret boundary: secret values stay in an external secret manager; SQLite stores hashes and `secret://agent-room/...` references.
+- Stored the admin API key and orchestrator local token in an external secret manager; seeded a temporary SQLite DB under `$TMPDIR/agent-room-runtime` with only refs and token hashes.
+- Runtime smoke validation used `$TMPDIR/agent-room-runtime` for SQLite and transcript artifacts; repo-local `data/` is ignored for user-run local persistence and was not used for Codex validation.
 - Review gate findings were fixed:
   - HTTP LLM providers now use `LLM_PROVIDER_TIMEOUT_MS`/AbortController and return `provider_timeout` errors instead of hanging dispatches.
   - Duplicate room event ids no longer re-project different payloads over the canonical event log.
@@ -64,8 +64,8 @@ Validation evidence:
 - `curl -fsS http://127.0.0.1:4000/health`: returned `{"ok":true,"service":"orchestrator"}` while `bun run dev` was running.
 - `curl -fsS http://127.0.0.1:3000`: returned the Vite app shell while `bun run dev` was running.
 - `POST /rooms/demo/context`: returned persisted `context.attached` event for `ctx_smoke`.
-- `GET /rooms/demo/transcript`: returned `ok: true` and wrote markdown under `/Volumes/ThunderBolt/_tmp/agent-room-runtime/smoke-artifacts/`.
-- Post-review smoke rerun: `curl` health/web/context/transcript passed and wrote markdown under `/Volumes/ThunderBolt/_tmp/agent-room-runtime/smoke2-artifacts/`.
+- `GET /rooms/demo/transcript`: returned `ok: true` and wrote markdown under `$TMPDIR/agent-room-runtime/smoke-artifacts/`.
+- Post-review smoke rerun: `curl` health/web/context/transcript passed and wrote markdown under `$TMPDIR/agent-room-runtime/smoke2-artifacts/`.
 - Focused fix verification job `5339dfda-2597-4592-ace6-adc64ab440a5`: correctness, security, and docs lanes all reported `pass` with zero remaining findings for the prior review items.
 - Browser visual smoke: skipped because Playwright was available but its Chromium binary was not installed; no browser download was performed during this pass.
 

@@ -202,7 +202,7 @@ function App() {
     "ctx_prd",
   ]);
   const [contextDraft, setContextDraft] = useState(
-    "SQLite should store room events and Vaultwarden secret references only.",
+    "SQLite should store room events and secret-manager references only.",
   );
   const [selectedContextId, setSelectedContextId] = useState("ctx_prd");
   const [spokenReplies, setSpokenReplies] = useState(true);

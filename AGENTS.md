@@ -1,14 +1,11 @@
 # Agent Room Agent Instructions
 
-This file applies to `/Volumes/ThunderBolt/Development/agent-room`.
-Parent policy still applies from `/Users/rico/.codex/AGENTS.md` and
-`/Volumes/ThunderBolt/Development/AGENTS.md`; use this file for repo-specific
-direction.
+Instructions for coding agents (and humans) working in this repo.
 
 ## Repo Purpose
 
 This is the canonical implementation repo for Agent Room / Voice Workroom: a
-browser-based room where Rico can type or speak with multiple named AI agents,
+browser-based room where a person can type or speak with multiple named AI agents,
 route work explicitly, see agent states and receipts, keep transcripts, and
 handoff summaries/actions to Hermes, Discord, or local artifacts.
 
@@ -21,8 +18,6 @@ Important source inputs:
 - `docs/architecture.md`
 - `docs/issue-backlog.md`
 - `docs/issues/`
-- `/Volumes/collab/rtech_ideas/voice-roundtable-mvp-v1-spec.md`
-- `/Volumes/collab/rtech_ideas/consulting/voice-roundtable/voice-roundtable-v1-spec.md`
 - `https://github.com/Skippy-the-Magnificent-one/voice-agent-workroom` as an
   idea source only.
 
@@ -37,7 +32,7 @@ Primary modes to support over time:
   STT, TTS, or realtime APIs where they make sense.
 - Local/hybrid mode: usable on a Mac mini M4 or local box with local STT/TTS/LLM
   lanes, optionally routed through LiteLLM.
-- Homelab mode: LiveKit/local services on TN01 or another internal host, with
+- Homelab mode: LiveKit/local services on a self-hosted box, with
   LiteLLM-first reasoning and Hermes/Discord handoff.
 
 Core design principle: voice, text, routing, agents, tools, and persistence are
@@ -110,11 +105,6 @@ personas over hard-coded role logic.
 ## Git And Local Work
 
 - Do not commit directly to protected branches.
-- Read `/Volumes/ThunderBolt/Development/_DOCS/GIT_STANDARDS.md` before branch,
-  commit, PR, issue, label, milestone, or board work.
-- Use `/opt/homebrew/bin/bash` for shell commands.
-- Use `/Volumes/ThunderBolt/_tmp` for scratch files, review worktrees,
-  downloaded artifacts, generated patches, and one-off tests.
-- Do not create temp/review/scratch directories beside repos under
-  `/Volumes/ThunderBolt/Development`.
+- Keep scratch files, review checkouts, and test artifacts outside the repo;
+  the tests and smoke script use the system temp directory.
 - Treat unrelated worktree changes as user-owned.

@@ -35,5 +35,5 @@ Keep deployment assumptions explicit. No hidden platform magic and no live infra
 ## Implementation Notes
 
 - `bun run test:e2e` runs `scripts/local-smoke.ts`.
-- The smoke script writes SQLite and transcript artifacts under `/Volumes/ThunderBolt/_tmp` by default, or `AGENT_ROOM_SMOKE_ROOT` when explicitly set.
+- The smoke script writes SQLite and transcript artifacts under the system temp directory (`os.tmpdir()`) by default, or `AGENT_ROOM_SMOKE_ROOT` when explicitly set.
 - Browser visual checks remain useful but are not the only E2E gate because Playwright browser binaries may not be installed in local Codex sessions.

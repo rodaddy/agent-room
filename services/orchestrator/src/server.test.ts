@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, test } from "bun:test";
-import { existsSync, mkdtempSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { SqliteStore } from "@agent-room/persistence";
@@ -15,9 +15,7 @@ let orchestrator: OrchestratorServer | undefined;
 let store: SqliteStore | undefined;
 
 beforeEach(() => {
-  const tempRoot = existsSync("/Volumes/ThunderBolt/_tmp")
-    ? "/Volumes/ThunderBolt/_tmp"
-    : tmpdir();
+  const tempRoot = tmpdir();
   const dir = mkdtempSync(join(tempRoot, "agent-room-orchestrator-"));
   store = new SqliteStore({
     databasePath: join(dir, "agent-room.sqlite"),
@@ -175,9 +173,7 @@ describe("orchestrator websocket rooms", () => {
 
   test("voice session responses and events do not expose provider secrets", async () => {
     await orchestrator?.stop();
-    const tempRoot = existsSync("/Volumes/ThunderBolt/_tmp")
-      ? "/Volumes/ThunderBolt/_tmp"
-      : tmpdir();
+    const tempRoot = tmpdir();
     const dir = mkdtempSync(join(tempRoot, "agent-room-orchestrator-secret-"));
     store = new SqliteStore({
       databasePath: join(dir, "agent-room.sqlite"),
