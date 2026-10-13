@@ -462,14 +462,14 @@ function seedProviderReferences(store: {
     id: "openai",
     provider: "openai",
     mode: "openai",
-    secretRef: "vaultwarden://agent-room/openai-api-key",
+    secretRef: "secret://agent-room/openai-api-key",
     enabled: Boolean(process.env.OPENAI_API_KEY),
   });
   const litellmConfig: ProviderConfigInput = {
     id: "litellm",
     provider: "litellm",
     mode: "litellm",
-    secretRef: "vaultwarden://agent-room/litellm-api-key",
+    secretRef: "secret://agent-room/litellm-api-key",
     enabled: Boolean(process.env.LITELLM_BASE_URL),
   };
   if (process.env.LITELLM_BASE_URL)

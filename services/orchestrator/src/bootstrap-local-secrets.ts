@@ -17,7 +17,7 @@ const secrets: BootstrapSecret[] = [
     envName: "AGENT_ROOM_ADMIN_KEY",
     secretRef:
       process.env.AGENT_ROOM_ADMIN_KEY_REF ??
-      "vaultwarden://agent-room/admin-api-key",
+      "secret://agent-room/admin-api-key",
     scopes: ["admin"],
   },
   {
@@ -26,7 +26,7 @@ const secrets: BootstrapSecret[] = [
     envName: "ORCHESTRATOR_LOCAL_TOKEN",
     secretRef:
       process.env.AGENT_ROOM_ORCHESTRATOR_TOKEN_REF ??
-      "vaultwarden://agent-room/orchestrator-local-token",
+      "secret://agent-room/orchestrator-local-token",
     scopes: [
       "room:connect",
       "context:write",

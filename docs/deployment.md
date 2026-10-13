@@ -8,7 +8,7 @@ Agent Room is a local-first app. The MVP should run for one to three humans and 
 - SQLite file path through `AGENT_ROOM_DB_PATH`.
 - Artifact directory through `AGENT_ROOM_ARTIFACT_DIR`.
 - Local orchestrator token through `ORCHESTRATOR_LOCAL_TOKEN` before exposing beyond loopback.
-- Secret values stored outside git, preferably Vaultwarden, with only `vaultwarden://agent-room/...` refs in SQLite/docs.
+- Secret values stored outside git, preferably a secret manager such as Vaultwarden, with only `secret://agent-room/...` refs in SQLite/docs.
 
 ## Cloud/API Mode
 

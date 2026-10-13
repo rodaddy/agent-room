@@ -112,7 +112,7 @@ Owns:
 
 - SQLite schema/migrations for the local MVP
 - room, participant, message, event, receipt, context, voice session, and handoff storage
-- local API key hash storage and Vaultwarden secret references
+- local API key hash storage and secret-manager references
 - transcript artifact export
 
 ## Room Event Flow
@@ -189,12 +189,12 @@ Minimum durable entities:
 
 The event log is the replay source. Tables optimized for views can be derived from the event log when useful.
 
-For the MVP, SQLite is the local source of replayable state. Secret material is never stored in SQLite; rows may store one-way API key hashes and non-secret Vaultwarden refs such as `vaultwarden://agent-room/orchestrator-local-token`.
+For the MVP, SQLite is the local source of replayable state. Secret material is never stored in SQLite; rows may store one-way API key hashes and non-secret secret-manager refs such as `secret://agent-room/orchestrator-local-token`.
 
 ## Security Boundaries
 
 - Provider secrets stay server-side.
-- Vaultwarden stores local API keys/provider secrets; SQLite stores hashes and references only.
+- A secret manager stores local API keys/provider secrets; SQLite stores hashes and references only.
 - Durable local tokens are accepted through bearer auth for exposed use; query-string tokens are loopback-development only.
 - Browser receives short-lived room/voice tokens only.
 - Adapter errors are sanitized before becoming room events.

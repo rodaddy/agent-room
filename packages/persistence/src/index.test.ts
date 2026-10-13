@@ -1,4 +1,4 @@
-import { existsSync, mkdtempSync } from "node:fs";
+import { mkdtempSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { describe, expect, test } from "bun:test";
@@ -66,17 +66,17 @@ describe("SqliteStore", () => {
     store.close();
   });
 
-  test("stores only hashed api keys and vaultwarden references", () => {
+  test("stores only hashed api keys and secret references", () => {
     const store = createTempStore();
     const record = store.registerApiKey({
       id: "admin",
       name: "Local Admin",
-      secretRef: "vaultwarden://agent-room/admin-api-key",
+      secretRef: "secret://agent-room/admin-api-key",
       token: "secret-token",
       scopes: ["admin"],
     });
 
-    expect(record.secretRef).toBe("vaultwarden://agent-room/admin-api-key");
+    expect(record.secretRef).toBe("secret://agent-room/admin-api-key");
     expect(record.tokenHash).not.toContain("secret-token");
     expect(store.verifyApiKey("secret-token")?.scopes).toEqual(["admin"]);
     expect(store.verifyApiKey("wrong")).toBeUndefined();
@@ -104,9 +104,7 @@ describe("SqliteStore", () => {
 });
 
 function createTempStore(): SqliteStore {
-  const tempRoot = existsSync("/Volumes/ThunderBolt/_tmp")
-    ? "/Volumes/ThunderBolt/_tmp"
-    : tmpdir();
+  const tempRoot = tmpdir();
   const dir = mkdtempSync(join(tempRoot, "agent-room-store-"));
   return new SqliteStore({
     databasePath: join(dir, "agent-room.sqlite"),
