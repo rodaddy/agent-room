@@ -37,6 +37,6 @@
     "@tailwindcss/vite": "latest",
     "prettier": "latest",
     "tailwindcss": "latest",
-    "typescript": "latest"
+    "typescript": "^7.0.2"
   }
 }
