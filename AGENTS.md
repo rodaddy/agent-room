@@ -18,8 +18,8 @@ Important source inputs:
 - `docs/architecture.md`
 - `docs/issue-backlog.md`
 - `docs/issues/`
-- `https://github.com/Skippy-the-Magnificent-one/voice-agent-workroom` as an
-  idea source only.
+
+The idea was inspired by an earlier voice-agent prototype.
 
 ## Product Direction
 
@@ -80,8 +80,8 @@ personas over hard-coded role logic.
 ## PRD And Issue Workflow
 
 - A full PRD should be written before broad implementation.
-- The PRD should reconcile this repo's current OpenAI-oriented plan with the
-  LiveKit/LiteLLM/local-capable voice roundtable specs.
+- The PRD should reconcile this repo's OpenAI-oriented plan with a
+  LiveKit/LiteLLM/local-capable voice path.
 - Issues should be sized so Codex can build the MVP in one or two serious
   passes, with clear acceptance criteria and validation commands.
 - If changing architecture direction, update `README.md`, `docs/architecture.md`,

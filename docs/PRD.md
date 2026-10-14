@@ -1,8 +1,7 @@
 # Agent Room / Voice Workroom PRD
 
 Status: MVP planning source of truth
-Canonical repo: `rodaddy/agent-room`
-Idea sources: `Skippy-the-Magnificent-one/voice-agent-workroom` and the local Voice Roundtable specs
+Inspired by an earlier voice-agent prototype.
 
 ## 1. Summary
 
@@ -19,7 +18,7 @@ The core product is the room event stream. Text, voice, agents, tools, receipts,
 - Work in three deployment modes: cloud/API, Mac mini M4 local/hybrid, and homelab LiveKit/LiteLLM.
 - Preserve transcript history and make session handoff possible through Hermes, Discord, or local artifacts.
 - Keep secrets server-side and make verification status distinct from natural-language agent claims.
-- Produce an issue set and GitHub Project board that Codex can use to build MVP in one or two serious implementation passes.
+- Produce an issue set that Codex can use to build MVP in one or two serious implementation passes.
 
 ## 3. Non-Goals
 
@@ -255,7 +254,7 @@ Acceptance tests:
 
 ## 15. Issue Map
 
-The MVP is tracked as ten issues in `docs/issues/` and on the GitHub Project board:
+The MVP is tracked as ten issue specs in `docs/issues/`:
 
 1. Monorepo scaffold and quality gates.
 2. Room UI shell and mock event timeline.

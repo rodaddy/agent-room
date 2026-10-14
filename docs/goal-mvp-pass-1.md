@@ -2,19 +2,17 @@
 
 ## Objective
 
-Build Agent Room / Voice Workroom MVP pass 1 from the canonical PRD and Project #7 using a board-first structured goal run.
+Build Agent Room / Voice Workroom MVP pass 1 from the canonical PRD and the issue specs in `docs/issues/` using a structured goal run.
 
 ## Source Of Truth
 
 - Repo: `agent-room` (local checkout)
-- Canonical GitHub repo: `rodaddy/agent-room`
-- Project board: `https://github.com/users/rodaddy/projects/7`
-- Planning PR: `https://github.com/rodaddy/agent-room/pull/11`
+- Issue specs: `docs/issues/`
 - PRD: `docs/PRD.md`
 - Architecture: `docs/architecture.md`
 - Backlog: `docs/issue-backlog.md`
 
-If PR #11 is merged, start from fresh `main` and immediately branch. If it is not merged, use `codex/mvp-prd-plan` as the source-of-truth base and branch from there.
+Start from fresh `main` with the planning docs merged, and immediately branch.
 
 ## Hard Branch Rule
 
@@ -24,7 +22,7 @@ If the queue is empty, create a WIP branch anyway before any edit so the working
 
 ## MVP Pass 1 Scope
 
-Implement issues #1-#5 as one vertical slice unless evidence shows a split is safer:
+Implement issues 01-05 in `docs/issues/` as one vertical slice unless evidence shows a split is safer:
 
 1. Scaffold monorepo and quality gates.
 2. Room UI shell and mock event timeline.
@@ -32,7 +30,7 @@ Implement issues #1-#5 as one vertical slice unless evidence shows a split is sa
 4. Orchestrator WebSocket room protocol.
 5. Deterministic routing and moderator state.
 
-Keep issues #6-#10 in backlog unless explicitly pulled into scope.
+Keep issues 06-10 in backlog unless explicitly pulled into scope.
 
 ## Product Decisions
 
@@ -47,17 +45,9 @@ Keep issues #6-#10 in backlog unless explicitly pulled into scope.
 - Do not hardwire OpenAI Realtime as the only voice architecture.
 - Use LiveKit Agents/examples as FOSS reference for later voice work, but own the Agent Room product layer.
 
-## Controller And Board Protocol
+## Controller Protocol
 
-Main Codex is accountable controller. Board state must be current before dispatching workers. Workers produce evidence only; the controller verifies before moving board state, opening PR readiness, closing issues, or declaring done.
-
-Before implementation, update Project #7 fields for issues #1-#5:
-
-- `Work Status`: In Progress when active.
-- `Validation`: Not Started until validation evidence exists.
-- `Review Gate`: Not Started until review begins.
-
-Advance fields only from verified evidence.
+Main Codex is accountable controller. Workers produce evidence only; the controller verifies before marking an issue in progress, opening PR readiness, closing issues, or declaring done. Advance issue state only from verified evidence.
 
 ## Worker Lanes
 
@@ -67,7 +57,7 @@ Use parallel workers only for disjoint useful lanes:
 2. UI worker: Vite/React room shell, mock timeline, roster, composer, context panel, receipts, voice controls.
 3. Orchestrator worker: WebSocket room service, participant state, event fanout.
 4. Routing worker: parser/state-machine tests for `@agent`, `@all`, names, `both`, `stop`, `hold`, and `pause`.
-5. Validation/review worker: input/output tests, smoke checks, docs consistency, board verification.
+5. Validation/review worker: input/output tests, smoke checks, docs consistency.
 
 No overlapping write ownership. If write sets collide, serialize through the controller.
 
@@ -118,7 +108,7 @@ Do not stop on missing provider keys, missing paid services, or unavailable live
 - MLX or local model installs are allowed only when lightweight and useful for MVP validation.
 - Prefer small, low-quality, fast test models for MVP; keep heavier local inference optional.
 - Build degraded paths intentionally and keep moving through non-blocking friction.
-- Stop only for destructive actions, credential access, paid API use, live infra mutation, external service changes, or architecture-shaping decisions that need Rico.
+- Stop only for destructive actions, credential access, paid API use, live infra mutation, external service changes, or architecture-shaping decisions that need the project owner.
 
 ## Documentation Standard
 
@@ -130,4 +120,4 @@ Stop before credential lookup, paid API use, live homelab mutation, destructive 
 
 ## Completion Target
 
-Open one PR for issues #1-#5 with committed code, updated docs, validation evidence, board fields current, and review-swarm/fix-verification results recorded.
+Open one PR for issues 01-05 with committed code, updated docs, validation evidence, and review-swarm/fix-verification results recorded.

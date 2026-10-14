@@ -82,7 +82,7 @@ Owns stable interfaces and provider implementations:
 
 Owns:
 
-- config-driven persona loading from Hermes backup metadata and local fallbacks
+- config-driven persona loading from Hermes-style persona folders and local fallbacks
 - agent turn execution
 - prompt/context assembly
 - lifecycle event emission

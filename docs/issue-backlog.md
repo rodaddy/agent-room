@@ -48,28 +48,20 @@ Issues 9-10:
 
 Definition of done: MVP can demonstrate voice transcript events through the same room routing path as text, start/end a local mock voice session, keep OpenAI Realtime and LiveKit behind swappable adapter slots, and run one local command that validates the demo path without live provider spend or homelab mutation.
 
-## GitHub Project Field Plan
+## Issue Tracking Fields
 
-Project: `https://github.com/users/rodaddy/projects/7`
-
-Project number: `7`
-
-Owner: `rodaddy`
-
-Configured project fields:
+Suggested tracker fields:
 
 - Work Status: Backlog, Todo, In Progress, In Review, Blocked, Done
 - Phase: P0 Scaffold, P1 UI, P2 Orchestrator, P3 Agents, P4 Context/Persistence, P5 Voice, P6 Validation
 - Priority: P0, P1, P2
 - Component: Docs/Planning, UI, Orchestrator, Room Events, Routing, Agents, Providers, Voice, Persistence, Workspace, Handoff, Validation
 - Validation: Not Started, Local Passed, E2E Passed, Live Check Pending, Live Check Passed, Blocked, Skipped With Reason
-- Review Gate: Not Started, Initial Review Pending, Findings Posted, Fixes In Progress, Zero Known Issues, Deferred By Rico
-
-GitHub's default `Status` field exists on the project with Todo, In Progress, and Done. Agents should use `Work Status` for the full board state and keep default `Status` compatible where useful.
+- Review Gate: Not Started, Initial Review Pending, Findings Posted, Fixes In Progress, Zero Known Issues, Deferred By Owner
 
 ## Board Hygiene
 
 - Move issues to Todo before dispatching an implementation pass.
 - Move issues to In Progress before worker execution starts.
 - Keep Validation and Review Gate current from evidence, not intent.
-- Do not close issues until acceptance criteria and validation commands have passed or Rico explicitly accepts a deferral.
+- Do not close issues until acceptance criteria and validation commands have passed or the project owner explicitly accepts a deferral.
